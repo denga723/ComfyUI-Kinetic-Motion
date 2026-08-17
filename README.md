@@ -60,9 +60,9 @@ Search for `ComfyUI-Kinetic-Motion` in ComfyUI Manager and click **Install**.
 
 ## 📂 Included Workflows
 
-The package includes pre-configured workflow JSON files in the `workflows/` directory:
+The package includes pre-configured workflow JSON files in the `workflow_examples/` directory:
 
-1. **`kinetic_motion_and_brush_preview_suite_workflow.json`**:
+1. **`kinetic_example.json`**:
    * Pure standalone workflow featuring the Extractor and Brush Renderer.
    * Full **7-output Preview Suite**:
      - Stage 1: Human Segmentation Mask
@@ -73,10 +73,10 @@ The package includes pre-configured workflow JSON files in the `workflows/` dire
      - Clean Motion Extractor Output
      - Kinetic Dynamic Brushstrokes Video
 
-2. **`gemini_omni_kinetic_motion_to_brush_workflow.json`**:
+2. **`Kinetic_with_JR_customnodes.json`**:
    * Complete end-to-end video-to-video stylization pipeline connecting Kinetic Brushstrokes to Google Gemini Omni and 4 Style Reference Images.
 
-3. **`kinetic_motion_parameters_comparison_workflow.json`**:
+3. **`parameter_comparison.json`**:
    * Parameter matrix comparing different decay rates, stroke thicknesses, velocity factors, and color modes.
 
 ---
