@@ -19,19 +19,23 @@ MEDIA_EXTS = IMAGE_EXTS | VIDEO_EXTS
 # ---------------------------------------------------------------------------
 # Custom API route: list files in a folder (for JS thumbnails)
 # ---------------------------------------------------------------------------
-@PromptServer.instance.routes.get("/jr/list_folder")
-async def list_folder_handler(request):
-    """Return JSON list of media files in a given folder path."""
-    folder = request.query.get("folder", "").strip()
-    if not folder or not os.path.isdir(folder):
-        return web.json_response({"files": [], "error": f"Not a valid folder: {folder}"})
+try:
+    if hasattr(PromptServer, "instance") and PromptServer.instance is not None:
+        @PromptServer.instance.routes.get("/jr/list_folder")
+        async def list_folder_handler(request):
+            """Return JSON list of media files in a given folder path."""
+            folder = request.query.get("folder", "").strip()
+            if not folder or not os.path.isdir(folder):
+                return web.json_response({"files": [], "error": f"Not a valid folder: {folder}"})
 
-    files = []
-    for entry in sorted(os.listdir(folder)):
-        ext = os.path.splitext(entry)[1].lower()
-        if ext in MEDIA_EXTS:
-            files.append(os.path.join(folder, entry).replace("\\", "/"))
-    return web.json_response({"files": files})
+            files = []
+            for entry in sorted(os.listdir(folder)):
+                ext = os.path.splitext(entry)[1].lower()
+                if ext in MEDIA_EXTS:
+                    files.append(os.path.join(folder, entry).replace("\\", "/"))
+            return web.json_response({"files": files})
+except Exception:
+    pass
 
 
 # ---------------------------------------------------------------------------

@@ -111,52 +111,56 @@ class WirelessGetterNode:
 
 
 # API Endpoints
-@PromptServer.instance.routes.get("/gemini/filebrowser/list")
-async def api_list_files(request):
-    folder = request.query.get("folder", "")
-    base_dir = folder_paths.get_output_directory()
-    target_path = os.path.normpath(os.path.join(base_dir, folder)) if folder else base_dir
+try:
+    if hasattr(PromptServer, "instance") and PromptServer.instance is not None:
+        @PromptServer.instance.routes.get("/gemini/filebrowser/list")
+        async def api_list_files(request):
+            folder = request.query.get("folder", "")
+            base_dir = folder_paths.get_output_directory()
+            target_path = os.path.normpath(os.path.join(base_dir, folder)) if folder else base_dir
 
-    if not target_path.startswith(os.path.normpath(base_dir)):
-        return web.json_response({"error": "Invalid folder path"}, status=400)
+            if not target_path.startswith(os.path.normpath(base_dir)):
+                return web.json_response({"error": "Invalid folder path"}, status=400)
 
-    files = []
-    if os.path.exists(target_path):
-        for root, _, filenames in os.walk(target_path):
-            for f in filenames:
-                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm')):
-                    full_p = os.path.join(root, f)
-                    rel_p = os.path.relpath(full_p, base_dir)
-                    subf = os.path.dirname(rel_p).replace("\\", "/")
-                    files.append({
-                        "filename": f,
-                        "subfolder": subf,
-                        "url": f"/view?filename={f}&subfolder={subf}&type=output",
-                        "relative_path": rel_p.replace("\\", "/")
-                    })
+            files = []
+            if os.path.exists(target_path):
+                for root, _, filenames in os.walk(target_path):
+                    for f in filenames:
+                        if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm')):
+                            full_p = os.path.join(root, f)
+                            rel_p = os.path.relpath(full_p, base_dir)
+                            subf = os.path.dirname(rel_p).replace("\\", "/")
+                            files.append({
+                                "filename": f,
+                                "subfolder": subf,
+                                "url": f"/view?filename={f}&subfolder={subf}&type=output",
+                                "relative_path": rel_p.replace("\\", "/")
+                            })
 
-    # Sort newest first
-    files.sort(key=lambda x: x["filename"], reverse=True)
+            # Sort newest first
+            files.sort(key=lambda x: x["filename"], reverse=True)
 
-    return web.json_response({"files": files, "shortcuts": SHORTCUT_STORE})
+            return web.json_response({"files": files, "shortcuts": SHORTCUT_STORE})
 
 
-@PromptServer.instance.routes.post("/gemini/filebrowser/shortcut")
-async def api_set_shortcut(request):
-    try:
-        data = await request.json()
-        key = data.get("key")
-        value = data.get("value")
-        if key:
-            SHORTCUT_STORE[key] = value
+        @PromptServer.instance.routes.post("/gemini/filebrowser/shortcut")
+        async def api_set_shortcut(request):
             try:
-                PromptServer.instance.send_sync("filebrowser-shortcuts-updated", SHORTCUT_STORE)
-            except Exception:
-                pass
-            return web.json_response({"status": "ok", "shortcuts": SHORTCUT_STORE})
-        return web.json_response({"error": "Missing key"}, status=400)
-    except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+                data = await request.json()
+                key = data.get("key")
+                value = data.get("value")
+                if key:
+                    SHORTCUT_STORE[key] = value
+                    try:
+                        PromptServer.instance.send_sync("filebrowser-shortcuts-updated", SHORTCUT_STORE)
+                    except Exception:
+                        pass
+                    return web.json_response({"status": "ok", "shortcuts": SHORTCUT_STORE})
+                return web.json_response({"error": "Missing key"}, status=400)
+            except Exception as e:
+                return web.json_response({"error": str(e)}, status=500)
+except Exception:
+    pass
 
 
 NODE_CLASS_MAPPINGS = {
