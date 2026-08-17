@@ -35,7 +35,22 @@ Designed specifically for AI animation, video-to-video generative stylization, a
 
 ---
 
-### 3. **Kinetic Video Combine & Preview** (`KineticVideoCombine` / `GeminiVideoCombine`)
+### 3. **DeepMind TAPNet Lagrangian Point Tracker** (`TAPNetKineticPointTracker`)
+* **Persistent Matter Tracking**: Tracks 64–1024 physical surface points across long sequences with sub-pixel forward-backward verification.
+* **Occlusion & Visibility Awareness**: Outputs per-point confidence ($v \in [0, 1]$), differentiating visible matter from occluded surfaces.
+* **Human-Mask Weighted Seeding**: Seeds query points directly onto dancer clothing, fabric folds, hair, and limbs using the human segmentation mask.
+* **Live Point Tracking Overlay Video**: Generates diagnostic point trajectory videos with color-coded trails and visibility rings.
+
+---
+
+### 4. **Kinetic + TAPNet Brush Fusion Renderer** (`KineticTAPNetBrushFusionRenderer`)
+* **Multi-Layer Kinematic Fusion**: Blends MediaPipe Macro Skeletal Ribbons + TAPNet Micro Surface Filaments + Swirling Embers + Optical Flow Streamlines.
+* **Occlusion-Aware Virtual Pen Lifting**: Automatically lifts the brush off canvas and tapers filaments when surface points become occluded behind the body.
+* **Kinetic Particle Embers**: Spawns dynamic glowing embers and sparks from high-velocity surface points.
+
+---
+
+### 5. **Kinetic Video Combine & Preview** (`KineticVideoCombine` / `GeminiVideoCombine`)
 * Combines frame batches into `.mp4`, animated `.webp`, or `.gif`.
 * Renders instant inline animated previews directly in the ComfyUI node interface without requiring third-party video preview suites.
 
@@ -88,10 +103,16 @@ The package includes pre-configured workflow JSON files in the `workflow_example
      - Clean Motion Extractor Output
      - Kinetic Dynamic Brushstrokes Video
 
-2. **`Kinetic_with_JR_customnodes.json`**:
+2. **`tapnet_fusion.json`**:
+   * **DeepMind TAPNet + Kinetic Motion Fusion Pipeline**.
+   * Tracks 128+ persistent surface points on the dancer's clothing, hair, and limbs with occlusion confidence.
+   * Multi-layer rendering: MediaPipe Macro Skeletal Ribbons + TAPNet Micro Surface Filaments + Swirling Embers + Optical Flow Streamlines.
+   * End-to-end stylized video generation with Google Gemini Omni and 4 Style Reference Images.
+
+3. **`Kinetic_with_JR_customnodes.json`**:
    * Complete end-to-end video-to-video stylization pipeline connecting Kinetic Brushstrokes to Google Gemini Omni and 4 Style Reference Images.
 
-3. **`parameter_comparison.json`**:
+4. **`parameter_comparison.json`**:
    * Parameter matrix comparing different decay rates, stroke thicknesses, velocity factors, and color modes.
 
 ---

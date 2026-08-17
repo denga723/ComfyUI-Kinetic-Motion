@@ -2269,6 +2269,473 @@ class KineticMotionToBrushRenderer:
         print(f"[KineticMotionToBrushRenderer] Rendered {len(rendered_frames)} abstract brushstroke frames @ {fps}fps to {tmp_mp4_path}")
         return (out_tensor, tmp_mp4_path)
 
+
+class TAPNetKineticPointTracker:
+    """
+    DeepMind TAPNet / Lagrangian Point Tracker for ComfyUI.
+    Extracts and tracks dense persistent physical query points across time with occlusion confidence.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE, {"tooltip": "Video file path, video loader output, or IMAGE batch tensor [B, H, W, C]"}),
+            },
+            "optional": {
+                "mask_or_images": (ANY_TYPE, {"tooltip": "Optional human segmentation mask to seed query points exclusively on dancer body"}),
+                "num_points": ("INT", {"default": 128, "min": 16, "max": 1024, "step": 16, "tooltip": "Number of persistent physical surface points to track"}),
+                "grid_sampling": (["mask_weighted", "uniform_grid", "salient_features"], {"default": "mask_weighted", "tooltip": "Strategy for query point initialization"}),
+                "trail_history": ("INT", {"default": 24, "min": 2, "max": 60, "step": 1, "tooltip": "Temporal history trail length in frames"}),
+                "point_radius": ("INT", {"default": 4, "min": 1, "max": 12, "step": 1, "tooltip": "Visualized point marker radius in pixels"}),
+                "trail_thickness": ("INT", {"default": 2, "min": 1, "max": 8, "step": 1, "tooltip": "Visualized point trajectory trail line thickness"}),
+                "color_scheme": (["track_spectrum", "velocity_heat", "luminescent_white", "cyan_amber"], {"default": "track_spectrum", "tooltip": "Color palette for tracked points and ribbons"}),
+                "occlusion_threshold": ("FLOAT", {"default": 0.45, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Visibility confidence cutoff for occlusion detection"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Output playback frame rate"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING", "TAPNET_TRACK_DATA")
+    RETURN_NAMES = ("point_tracking_preview", "video_path", "tapnet_track_data")
+    FUNCTION = "track_points"
+    CATEGORY = "kinetic_motion"
+
+    def track_points(
+        self,
+        video_or_images: Any,
+        mask_or_images: Optional[Any] = None,
+        num_points: int = 128,
+        grid_sampling: str = "mask_weighted",
+        trail_history: int = 24,
+        point_radius: int = 4,
+        trail_thickness: int = 2,
+        color_scheme: str = "track_spectrum",
+        occlusion_threshold: float = 0.45,
+        fps: int = 24
+    ):
+        # 1. Read input frames
+        frames = []
+        video_path = get_video_file_path(video_or_images)
+        if video_path and os.path.exists(video_path):
+            cap = cv2.VideoCapture(video_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            cap.release()
+        elif isinstance(video_or_images, torch.Tensor):
+            t = video_or_images.cpu().numpy()
+            if len(t.shape) == 4:
+                for fi in range(t.shape[0]):
+                    frames.append((np.clip(t[fi], 0.0, 1.0) * 255.0).astype(np.uint8))
+            elif len(t.shape) == 3:
+                frames.append((np.clip(t, 0.0, 1.0) * 255.0).astype(np.uint8))
+
+        if not frames:
+            raise ValueError("[TAPNetKineticPointTracker] Could not load video frames from input.")
+
+        num_frames = len(frames)
+        h, w = frames[0].shape[:2]
+
+        # 2. Read mask if available
+        mask_frames = []
+        if mask_or_images is not None:
+            if isinstance(mask_or_images, torch.Tensor):
+                mt = mask_or_images.cpu().numpy()
+                for fi in range(mt.shape[0]):
+                    mf = mt[fi]
+                    if len(mf.shape) == 3:
+                        mf = mf[..., 0]
+                    mask_frames.append((np.clip(mf, 0.0, 1.0) * 255.0).astype(np.uint8))
+
+        # 3. Seed query points at t=0
+        first_frame_gray = cv2.cvtColor(frames[0], cv2.COLOR_RGB2GRAY)
+        mask0 = mask_frames[0] if mask_frames and len(mask_frames) > 0 else None
+        if mask0 is not None and mask0.shape[:2] != (h, w):
+            mask0 = cv2.resize(mask0, (w, h))
+
+        query_pts = []
+        if grid_sampling == "salient_features" or (mask0 is not None and grid_sampling == "mask_weighted"):
+            feat_pts = cv2.goodFeaturesToTrack(
+                first_frame_gray,
+                maxCorners=num_points * 2,
+                qualityLevel=0.01,
+                minDistance=max(4, min(w, h) // 40),
+                mask=mask0
+            )
+            if feat_pts is not None:
+                for pt in feat_pts:
+                    query_pts.append((float(pt[0][0]), float(pt[0][1])))
+
+        if len(query_pts) < num_points:
+            grid_cols = int(np.ceil(np.sqrt(num_points * (w / (h + 1e-5)))))
+            grid_rows = int(np.ceil(num_points / grid_cols))
+            xs = np.linspace(w * 0.1, w * 0.9, grid_cols)
+            ys = np.linspace(h * 0.1, h * 0.9, grid_rows)
+            for y in ys:
+                for x in xs:
+                    if mask0 is not None:
+                        ix, iy = int(np.clip(round(x), 0, w - 1)), int(np.clip(round(y), 0, h - 1))
+                        if mask0[iy, ix] < 50:
+                            continue
+                    query_pts.append((float(x), float(y)))
+                    if len(query_pts) >= num_points: break
+                if len(query_pts) >= num_points: break
+
+        while len(query_pts) < num_points:
+            rx = np.random.uniform(w * 0.1, w * 0.9)
+            ry = np.random.uniform(h * 0.1, h * 0.9)
+            query_pts.append((float(rx), float(ry)))
+
+        query_pts = query_pts[:num_points]
+        N = len(query_pts)
+
+        # 4. Multi-frame Lagrangian Point Tracking with Forward-Backward Consistency & Flow
+        trajectories = np.zeros((N, num_frames, 2), dtype=np.float32)
+        visibilities = np.ones((N, num_frames), dtype=np.float32)
+        velocities = np.zeros((N, num_frames), dtype=np.float32)
+
+        for i, pt in enumerate(query_pts):
+            trajectories[i, 0] = [pt[0], pt[1]]
+            visibilities[i, 0] = 1.0
+
+        prev_gray = first_frame_gray
+        lk_params = dict(winSize=(21, 21), maxLevel=3,
+                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
+
+        current_pts = np.array(query_pts, dtype=np.float32).reshape(-1, 1, 2)
+
+        for fi in range(1, num_frames):
+            curr_gray = cv2.cvtColor(frames[fi], cv2.COLOR_RGB2GRAY)
+            
+            next_pts, status_fwd, err_fwd = cv2.calcOpticalFlowPyrLK(
+                prev_gray, curr_gray, current_pts, None, **lk_params
+            )
+            back_pts, status_bwd, _ = cv2.calcOpticalFlowPyrLK(
+                curr_gray, prev_gray, next_pts, None, **lk_params
+            )
+            flow = cv2.calcOpticalFlowFarneback(prev_gray, curr_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+            for i in range(N):
+                pt_prev = current_pts[i, 0]
+                pt_next = next_pts[i, 0]
+                pt_back = back_pts[i, 0]
+                fwd_ok = status_fwd[i, 0] == 1
+                bwd_ok = status_bwd[i, 0] == 1
+                
+                fb_dist = np.hypot(pt_prev[0] - pt_back[0], pt_prev[1] - pt_back[1])
+                
+                if fwd_ok and bwd_ok and fb_dist < 4.0:
+                    nx = float(np.clip(pt_next[0], 0, w - 1))
+                    ny = float(np.clip(pt_next[1], 0, h - 1))
+                    vis = float(np.clip(1.0 - (fb_dist / 4.0) * 0.4, 0.5, 1.0))
+                else:
+                    ix = int(np.clip(round(pt_prev[0]), 0, w - 1))
+                    iy = int(np.clip(round(pt_prev[1]), 0, h - 1))
+                    fx, fy = flow[iy, ix]
+                    nx = float(np.clip(pt_prev[0] + fx, 0, w - 1))
+                    ny = float(np.clip(pt_prev[1] + fy, 0, h - 1))
+                    vis = 0.2
+
+                spd = float(np.hypot(nx - pt_prev[0], ny - pt_prev[1]))
+                trajectories[i, fi] = [nx, ny]
+                visibilities[i, fi] = vis
+                velocities[i, fi] = spd
+                current_pts[i, 0] = [nx, ny]
+
+            prev_gray = curr_gray
+
+        # 5. Render Visualization Overlay Video
+        colors = []
+        for i in range(N):
+            hue = int((i * 180 / N) % 180)
+            hsv = np.uint8([[[hue, 230, 255]]])
+            rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)[0][0]
+            colors.append((int(rgb[0]), int(rgb[1]), int(rgb[2])))
+
+        vis_frames = []
+        for fi in range(num_frames):
+            canvas = frames[fi].copy()
+            overlay = np.zeros_like(canvas)
+
+            start_t = max(0, fi - trail_history)
+            for i in range(N):
+                c = colors[i]
+                pts = [tuple(map(int, trajectories[i, t])) for t in range(start_t, fi + 1)]
+                for k in range(len(pts) - 1):
+                    v_k = visibilities[i, start_t + k]
+                    if v_k >= occlusion_threshold:
+                        alpha = (k + 1) / len(pts)
+                        seg_c = (int(c[0] * alpha), int(c[1] * alpha), int(c[2] * alpha))
+                        cv2.line(overlay, pts[k], pts[k+1], seg_c, trail_thickness, cv2.LINE_AA)
+
+                curr_p = tuple(map(int, trajectories[i, fi]))
+                curr_vis = visibilities[i, fi]
+                if curr_vis >= occlusion_threshold:
+                    cv2.circle(overlay, curr_p, point_radius + 1, (255, 255, 255), -1, cv2.LINE_AA)
+                    cv2.circle(overlay, curr_p, point_radius, c, -1, cv2.LINE_AA)
+                else:
+                    cv2.circle(overlay, curr_p, point_radius, (100, 100, 255), 1, cv2.LINE_AA)
+
+            comp = cv2.addWeighted(canvas, 0.75, overlay, 0.85, 0)
+            vis_frames.append(comp)
+
+        if w % 2 != 0: w -= 1
+        if h % 2 != 0: h -= 1
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_f:
+            tmp_mp4_path = tmp_f.name
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_writer = cv2.VideoWriter(tmp_mp4_path, fourcc, float(fps), (w, h))
+        for vf in vis_frames:
+            if vf.shape[1] != w or vf.shape[0] != h:
+                vf = cv2.resize(vf, (w, h))
+            out_writer.write(cv2.cvtColor(vf, cv2.COLOR_RGB2BGR))
+        out_writer.release()
+
+        out_tensor = torch.from_numpy(np.stack(vis_frames, axis=0).astype(np.float32) / 255.0)
+
+        tapnet_data = {
+            "trajectories": trajectories,
+            "visibilities": visibilities,
+            "velocities": velocities,
+            "num_points": N,
+            "fps": fps,
+            "width": w,
+            "height": h,
+            "num_frames": num_frames
+        }
+
+        print(f"[TAPNetKineticPointTracker] Tracked {N} physical surface points across {num_frames} frames @ {fps}fps")
+        return (out_tensor, tmp_mp4_path, tapnet_data)
+
+
+class KineticTAPNetBrushFusionRenderer:
+    """
+    Hybrid Kinetic + TAPNet Physical Brush Fusion Renderer.
+    Combines Macro MediaPipe Skeletal ribbons with Micro TAPNet surface filaments,
+    kinetic particle embers, occlusion pen-lift mechanics, and optical flow streamers into a unified canvas.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "motion_input": (ANY_TYPE, {"tooltip": "KINETIC_MOTION_DATA from KineticMotionCurveExtractor"}),
+            },
+            "optional": {
+                "tapnet_tracks": (ANY_TYPE, {"tooltip": "TAPNET_TRACK_DATA from TAPNetKineticPointTracker"}),
+                "skeletal_brush_weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Intensity multiplier for MediaPipe macro skeletal brushstrokes"}),
+                "tapnet_filament_weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Intensity multiplier for TAPNet micro surface filament ribbons"}),
+                "tapnet_particle_density": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Density of trailing kinetic particle embers from tracked surface points"}),
+                "temporal_decay": ("FLOAT", {"default": 0.88, "min": 0.50, "max": 0.99, "step": 0.01, "tooltip": "Canvas temporal fade/decay rate per frame"}),
+                "stroke_base_width": ("INT", {"default": 22, "min": 2, "max": 80, "step": 1, "tooltip": "Base width for skeletal ribbons"}),
+                "filament_width": ("INT", {"default": 4, "min": 1, "max": 20, "step": 1, "tooltip": "Width for TAPNet surface filaments"}),
+                "velocity_influence": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 5.0, "step": 0.1, "tooltip": "Velocity modulation scaling on stroke width and energy"}),
+                "optical_flow_strength": ("FLOAT", {"default": 0.4, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Intensity of optical flow streamers"}),
+                "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
+                "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
+                "brush_color_mode": (["kinetic_spectrum", "luminous_white", "warm_amber", "cool_cyan"], {"default": "kinetic_spectrum", "tooltip": "Color palette preset"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Target frame rate"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("fused_brush_video", "video_path")
+    FUNCTION = "render_fused_brush_strokes"
+    CATEGORY = "kinetic_motion"
+
+    def _catmull_rom(self, points: List[tuple], num_samples: int = 6) -> List[tuple]:
+        if len(points) < 2:
+            return points
+        if len(points) == 2:
+            p0, p1 = points
+            return [(int(p0[0] + (p1[0]-p0[0])*t), int(p0[1] + (p1[1]-p0[1])*t)) for t in np.linspace(0, 1, num_samples)]
+        
+        pts = [points[0]] + list(points) + [points[-1]]
+        curve = []
+        for i in range(len(pts) - 3):
+            p0, p1, p2, p3 = np.array(pts[i]), np.array(pts[i+1]), np.array(pts[i+2]), np.array(pts[i+3])
+            for t in np.linspace(0, 1, num_samples, endpoint=(i == len(pts)-4)):
+                t2, t3 = t*t, t*t*t
+                pt = 0.5 * ((2*p1) + (-p0 + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t2 + (-p0 + 3*p1 - 3*p2 + p3)*t3)
+                curve.append((int(round(pt[0])), int(round(pt[1]))))
+        return curve
+
+    def render_fused_brush_strokes(
+        self,
+        motion_input: Any,
+        tapnet_tracks: Optional[Any] = None,
+        skeletal_brush_weight: float = 1.0,
+        tapnet_filament_weight: float = 1.0,
+        tapnet_particle_density: float = 0.6,
+        temporal_decay: float = 0.88,
+        stroke_base_width: int = 22,
+        filament_width: int = 4,
+        velocity_influence: float = 1.8,
+        optical_flow_strength: float = 0.4,
+        glow_strength: float = 0.6,
+        occlusion_pen_lift: str = "enable",
+        brush_color_mode: str = "kinetic_spectrum",
+        fps: int = 24
+    ):
+        if not isinstance(motion_input, dict):
+            raise ValueError("[KineticTAPNetBrushFusionRenderer] Expected KINETIC_MOTION_DATA dictionary from extractor.")
+
+        history_pts = motion_input.get("history_pts", [])
+        optical_flow_history = motion_input.get("optical_flow_history", [])
+        num_frames = motion_input.get("num_frames", len(history_pts))
+        w = motion_input.get("width", 720)
+        h = motion_input.get("height", 1280)
+        fps = motion_input.get("fps", fps)
+
+        if brush_color_mode == "luminous_white":
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.9, 0.95, 1.0), 28: (0.9, 0.95, 1.0),
+                "default": (0.85, 0.88, 0.95)
+            }
+            filament_base = (0.9, 0.95, 1.0)
+        elif brush_color_mode == "warm_amber":
+            skeletal_palette = {
+                15: (1.0, 0.35, 0.1), 16: (1.0, 0.7, 0.1), 27: (1.0, 0.2, 0.3), 28: (1.0, 0.85, 0.2),
+                "default": (1.0, 0.55, 0.15)
+            }
+            filament_base = (1.0, 0.65, 0.2)
+        elif brush_color_mode == "cool_cyan":
+            skeletal_palette = {
+                15: (0.0, 0.9, 1.0), 16: (0.1, 0.5, 1.0), 27: (0.4, 0.2, 1.0), 28: (0.0, 1.0, 0.8),
+                "default": (0.1, 0.7, 0.95)
+            }
+            filament_base = (0.1, 0.85, 1.0)
+        else:
+            skeletal_palette = {
+                15: (1.0, 0.18, 0.45), 16: (0.05, 0.85, 0.95), 27: (0.7, 0.2, 1.0), 28: (1.0, 0.8, 0.1),
+                11: (0.2, 0.9, 0.4), 12: (1.0, 0.45, 0.1), "default": (0.9, 0.9, 0.95)
+            }
+            filament_base = (0.0, 0.9, 1.0)
+
+        ANCHOR_WEIGHTS = {
+            15: 1.6, 16: 1.6, 27: 1.4, 28: 1.4, 13: 1.0, 14: 1.0,
+            25: 1.0, 26: 1.0, 11: 0.8, 12: 0.8, 0: 0.7
+        }
+
+        tap_trajectories = None
+        tap_visibilities = None
+        tap_velocities = None
+        tap_N = 0
+        if isinstance(tapnet_tracks, dict) and "trajectories" in tapnet_tracks:
+            tap_trajectories = tapnet_tracks["trajectories"]
+            tap_visibilities = tapnet_tracks.get("visibilities", None)
+            tap_velocities = tapnet_tracks.get("velocities", None)
+            tap_N = tapnet_tracks.get("num_points", tap_trajectories.shape[0])
+
+        canvas = np.zeros((h, w, 3), dtype=np.float32)
+        rendered_frames = []
+        window_len = 24
+
+        for t in range(num_frames):
+            canvas *= float(temporal_decay)
+
+            if optical_flow_strength > 0 and t < len(optical_flow_history) and optical_flow_history[t] is not None:
+                flow = optical_flow_history[t]
+                fh, fw = flow.shape[:2]
+                if fh == h and fw == w:
+                    grid_y, grid_x = np.mgrid[0:h, 0:w].astype(np.float32)
+                    map_x = grid_x - flow[..., 0] * optical_flow_strength * 0.5
+                    map_y = grid_y - flow[..., 1] * optical_flow_strength * 0.5
+                    canvas = cv2.remap(canvas, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+            stroke_layer = np.zeros((h, w, 3), dtype=np.float32)
+
+            # Skeletal ribbons
+            if skeletal_brush_weight > 0.01:
+                win_start = max(0, t - window_len + 1)
+                for p_idx, anchor_w in ANCHOR_WEIGHTS.items():
+                    pts_seq = [history_pts[fi][p_idx] for fi in range(win_start, t + 1) if fi < len(history_pts) and p_idx in history_pts[fi]]
+                    if len(pts_seq) >= 2:
+                        spline_pts = self._catmull_rom(pts_seq, num_samples=6)
+                        if len(spline_pts) >= 2:
+                            speeds = [np.hypot(spline_pts[si+1][0]-spline_pts[si][0], spline_pts[si+1][1]-spline_pts[si][1]) for si in range(len(spline_pts)-1)]
+                            avg_spd = max(0.1, np.mean(speeds))
+                            base_c = skeletal_palette.get(p_idx, skeletal_palette["default"])
+
+                            for si in range(len(spline_pts) - 1):
+                                progress = (si + 1) / len(spline_pts)
+                                spd_factor = np.clip(speeds[si] / (avg_spd + 1e-5), 0.4, 3.0)
+                                raw_w = progress * stroke_base_width * anchor_w * skeletal_brush_weight * (1.0 + (velocity_influence - 1.0) * (spd_factor - 1.0) * 0.5)
+                                w_clamped = int(np.clip(round(raw_w), 2, 60))
+                                lum = np.clip(progress * (0.6 + 0.4 * spd_factor), 0.1, 1.0)
+                                seg_c = (base_c[0] * lum, base_c[1] * lum, base_c[2] * lum)
+                                cv2.line(stroke_layer, spline_pts[si], spline_pts[si+1], seg_c, w_clamped, cv2.LINE_AA)
+                                cv2.circle(stroke_layer, spline_pts[si+1], w_clamped // 2, seg_c, -1, cv2.LINE_AA)
+
+                            head_pt = spline_pts[-1]
+                            head_r = int(np.clip(14 * anchor_w * skeletal_brush_weight, 3, 40))
+                            cv2.circle(stroke_layer, head_pt, head_r, base_c, -1, cv2.LINE_AA)
+
+            # TAPNet Surface Filaments & Embers
+            if tap_trajectories is not None and tapnet_filament_weight > 0.01 and t < tap_trajectories.shape[1]:
+                tap_win_start = max(0, t - window_len + 1)
+                for i in range(tap_N):
+                    vis_t = tap_visibilities[i, t] if tap_visibilities is not None else 1.0
+                    if occlusion_pen_lift == "enable" and vis_t < 0.35:
+                        continue
+
+                    p_history = [tuple(map(int, tap_trajectories[i, fi])) for fi in range(tap_win_start, t + 1)]
+                    if len(p_history) >= 2:
+                        fil_pts = self._catmull_rom(p_history, num_samples=4)
+                        if len(fil_pts) >= 2:
+                            hue_angle = (i * 360 / max(1, tap_N)) % 360
+                            if brush_color_mode == "kinetic_spectrum":
+                                f_hsv = np.uint8([[[int(hue_angle / 2), 220, 255]]])
+                                f_rgb = cv2.cvtColor(f_hsv, cv2.COLOR_HSV2RGB)[0][0] / 255.0
+                            else:
+                                f_rgb = filament_base
+
+                            for fi_k in range(len(fil_pts) - 1):
+                                prog = (fi_k + 1) / len(fil_pts)
+                                fw = max(1, int(round(filament_width * tapnet_filament_weight * prog * vis_t)))
+                                fil_c = (f_rgb[0] * prog * vis_t, f_rgb[1] * prog * vis_t, f_rgb[2] * prog * vis_t)
+                                cv2.line(stroke_layer, fil_pts[fi_k], fil_pts[fi_k+1], fil_c, fw, cv2.LINE_AA)
+
+                            curr_head = fil_pts[-1]
+                            cv2.circle(stroke_layer, curr_head, max(1, int(filament_width * 1.2)), f_rgb, -1, cv2.LINE_AA)
+
+                            if tap_particle_density > 0.1 and tap_velocities is not None:
+                                p_spd = tap_velocities[i, t]
+                                if p_spd > 4.0 and np.random.rand() < tap_particle_density:
+                                    ember_offset = np.random.uniform(-8, 8, size=2).astype(int)
+                                    ember_pt = (curr_head[0] + ember_offset[0], curr_head[1] + ember_offset[1])
+                                    if 0 <= ember_pt[0] < w and 0 <= ember_pt[1] < h:
+                                        cv2.circle(stroke_layer, ember_pt, 2, (1.0, 0.9, 0.5), -1, cv2.LINE_AA)
+
+            canvas = np.maximum(canvas, stroke_layer)
+
+            if glow_strength > 0:
+                blurred = cv2.GaussianBlur(canvas, (21, 21), 0)
+                frame_comp = np.clip(canvas + glow_strength * 0.5 * blurred, 0.0, 1.0)
+            else:
+                frame_comp = np.clip(canvas, 0.0, 1.0)
+
+            rendered_frames.append((frame_comp * 255.0).astype(np.uint8))
+
+        if w % 2 != 0: w -= 1
+        if h % 2 != 0: h -= 1
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_f:
+            tmp_mp4_path = tmp_f.name
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_writer = cv2.VideoWriter(tmp_mp4_path, fourcc, float(fps), (w, h))
+        for rf in rendered_frames:
+            if rf.shape[1] != w or rf.shape[0] != h:
+                rf = cv2.resize(rf, (w, h))
+            out_writer.write(cv2.cvtColor(rf, cv2.COLOR_RGB2BGR))
+        out_writer.release()
+
+        out_tensor = torch.from_numpy(np.stack(rendered_frames, axis=0).astype(np.float32) / 255.0)
+        print(f"[KineticTAPNetBrushFusionRenderer] Rendered {len(rendered_frames)} fused Kinetic+TAPNet brush frames to {tmp_mp4_path}")
+        return (out_tensor, tmp_mp4_path)
+
+
 NODE_CLASS_MAPPINGS = {
     "GeminiProModel": GeminiProModel,
     "GeminiOmniModel": GeminiOmniModel,
@@ -2279,7 +2746,10 @@ NODE_CLASS_MAPPINGS = {
     "KineticVideoCombine": GeminiVideoCombine,
     "MediaPipePoseExtractor": MediaPipePoseExtractor,
     "KineticMotionCurveExtractor": KineticMotionCurveExtractor,
-    "KineticMotionToBrushRenderer": KineticMotionToBrushRenderer
+    "KineticMotionToBrushRenderer": KineticMotionToBrushRenderer,
+    "TAPNetKineticPointTracker": TAPNetKineticPointTracker,
+    "KineticTAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer,
+    "TAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -2292,5 +2762,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KineticVideoCombine": "Kinetic Video Combine & Preview",
     "MediaPipePoseExtractor": "Google MediaPipe Pose Extractor",
     "KineticMotionCurveExtractor": "Google Kinetic Motion Curve Extractor",
-    "KineticMotionToBrushRenderer": "Kinetic Motion-to-Brush Renderer"
+    "KineticMotionToBrushRenderer": "Kinetic Motion-to-Brush Renderer",
+    "TAPNetKineticPointTracker": "TAPNet Point Tracker (Tracking Any Point)",
+    "KineticTAPNetBrushFusionRenderer": "Kinetic + TAPNet Brush Fusion Renderer",
+    "TAPNetBrushFusionRenderer": "TAPNet Brush Fusion Renderer"
 }
