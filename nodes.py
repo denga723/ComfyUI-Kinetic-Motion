@@ -927,7 +927,7 @@ class GeminiVideoCombine:
             "required": {
                 "images": ("IMAGE", {"tooltip": "Batch of image frames from Gemini Omni / video node"}),
                 "frame_rate": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1, "tooltip": "Playback frame rate (FPS)"}),
-                "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
+                "format": (["mp4", "animated_webp", "gif", "video/mp4", "image/webp", "image/gif"], {"default": "mp4"}),
                 "save_output": ("BOOLEAN", {"default": True, "tooltip": "Save output to ComfyUI output directory"}),
                 "filename_prefix": ("STRING", {"default": "GeminiVideo", "tooltip": "Prefix for saved video/animation files"}),
             }
@@ -963,7 +963,7 @@ class GeminiVideoCombine:
         saved_file_path = ""
         ui_results = []
 
-        if format == "animated_webp":
+        if format in ["animated_webp", "image/webp"]:
             file_name = f"{filename}_{counter:05d}_.webp"
             saved_file_path = os.path.join(full_output_folder, file_name)
             pil_frames[0].save(
