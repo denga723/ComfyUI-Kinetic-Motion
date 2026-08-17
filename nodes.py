@@ -2296,7 +2296,7 @@ class TAPNetKineticPointTracker:
                 "trail_history": ("INT", {"default": 24, "min": 2, "max": 60, "step": 1, "tooltip": "Temporal history trail length in frames"}),
                 "point_radius": ("INT", {"default": 5, "min": 1, "max": 16, "step": 1, "tooltip": "Visualized point marker radius in pixels"}),
                 "trail_thickness": ("INT", {"default": 3, "min": 1, "max": 12, "step": 1, "tooltip": "Visualized point trajectory trail line thickness"}),
-                "color_scheme": (["radiant_red", "track_spectrum", "velocity_heat", "luminescent_white", "cyan_amber"], {"default": "radiant_red", "tooltip": "Color palette for tracked points and ribbons"}),
+                "color_scheme": (["radiant_red", "emerald_green", "electric_blue", "hot_pink", "luminous_white", "golden_amber", "track_spectrum", "velocity_heat", "cyan_amber"], {"default": "radiant_red", "tooltip": "Color palette for tracked points and ribbons"}),
                 "occlusion_threshold": ("FLOAT", {"default": 0.40, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Visibility confidence cutoff for occlusion detection"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Output playback frame rate"}),
             }
@@ -2349,7 +2349,6 @@ class TAPNetKineticPointTracker:
         history_keypoints = None
 
         if isinstance(mask_or_images, dict):
-            # Passed KINETIC_MOTION_DATA bundle
             masks_list = mask_or_images.get("masks_list", [])
             if masks_list and masks_list[0] is not None:
                 mask0 = (masks_list[0].astype(np.uint8) * 255)
@@ -2361,7 +2360,6 @@ class TAPNetKineticPointTracker:
             if len(mt.shape) == 4:
                 mf = mt[0]
                 if len(mf.shape) == 3:
-                    # Convert to grayscale mask: detect non-black regions
                     mf_gray = np.mean(mf, axis=-1)
                     mask0 = (mf_gray > 0.08).astype(np.uint8) * 255
             elif len(mt.shape) == 3:
@@ -2370,7 +2368,6 @@ class TAPNetKineticPointTracker:
         if mask0 is not None and mask0.shape[:2] != (h, w):
             mask0 = cv2.resize(mask0, (w, h))
 
-        # Fallback: if no mask, compute motion saliency between first 3 frames to isolate moving dancer
         if mask0 is None and num_frames >= 2:
             g0 = cv2.cvtColor(frames[0], cv2.COLOR_RGB2GRAY)
             g1 = cv2.cvtColor(frames[min(2, num_frames - 1)], cv2.COLOR_RGB2GRAY)
@@ -2384,7 +2381,6 @@ class TAPNetKineticPointTracker:
         # 3. Strictly Seed Query Points Exclusively on Dancer
         query_pts = []
 
-        # Add landmark seeds (wrists, elbows, feet, torso)
         if history_keypoints:
             for pt_idx in [15, 16, 27, 28, 13, 14, 25, 26, 11, 12, 0]:
                 if pt_idx in history_keypoints:
@@ -2392,7 +2388,6 @@ class TAPNetKineticPointTracker:
                     if 0 <= kp[0] < w and 0 <= kp[1] < h:
                         query_pts.append((float(kp[0]), float(kp[1])))
 
-        # Extract features strictly inside dancer mask
         if mask0 is not None and np.sum(mask0 > 25) > 100:
             feat_pts = cv2.goodFeaturesToTrack(
                 first_frame_gray,
@@ -2405,7 +2400,6 @@ class TAPNetKineticPointTracker:
                 for pt in feat_pts:
                     query_pts.append((float(pt[0][0]), float(pt[0][1])))
 
-            # Fill remaining points strictly inside mask pixels
             if len(query_pts) < num_points:
                 y_idx, x_idx = np.where(mask0 > 25)
                 if len(x_idx) > 0:
@@ -2415,7 +2409,6 @@ class TAPNetKineticPointTracker:
                         query_pts.append((float(x_idx[c_i]), float(y_idx[c_i])))
                         if len(query_pts) >= num_points: break
         else:
-            # Saliency-based fallback
             grid_cols = int(np.ceil(np.sqrt(num_points * (w / (h + 1e-5)))))
             grid_rows = int(np.ceil(num_points / grid_cols))
             xs = np.linspace(w * 0.2, w * 0.8, grid_cols)
@@ -2429,7 +2422,7 @@ class TAPNetKineticPointTracker:
         query_pts = query_pts[:num_points]
         N = len(query_pts)
 
-        # 4. Multi-frame Lagrangian Point Tracking with Forward-Backward Consistency & Flow
+        # 4. Multi-frame Lagrangian Point Tracking
         trajectories = np.zeros((N, num_frames, 2), dtype=np.float32)
         visibilities = np.ones((N, num_frames), dtype=np.float32)
         velocities = np.zeros((N, num_frames), dtype=np.float32)
@@ -2484,35 +2477,57 @@ class TAPNetKineticPointTracker:
 
             prev_gray = curr_gray
 
-        # 5. Render Visualization: Radiant Red Points & Trails on Pure Black Canvas
+        # 5. Render Visualization on Pure Black Canvas with Chosen Color Palette
         vis_frames = []
         for fi in range(num_frames):
-            # Pure Black Background
             canvas = np.zeros((h, w, 3), dtype=np.uint8)
-
             start_t = max(0, fi - trail_history)
+
             for i in range(N):
+                # Determine point color based on color_scheme
+                if color_scheme == "emerald_green":
+                    base_rgb = (30, 255, 90)
+                elif color_scheme == "electric_blue":
+                    base_rgb = (20, 180, 255)
+                elif color_scheme == "hot_pink":
+                    base_rgb = (255, 40, 180)
+                elif color_scheme == "luminous_white":
+                    base_rgb = (245, 248, 255)
+                elif color_scheme == "golden_amber":
+                    base_rgb = (255, 175, 30)
+                elif color_scheme == "cyan_amber":
+                    prog = float(i) / float(max(1, N - 1))
+                    base_rgb = (int(20 + 235 * prog), int(180 - 10 * prog), int(255 - 225 * prog))
+                elif color_scheme == "velocity_heat":
+                    v = velocities[i, fi]
+                    v_norm = np.clip(v / 8.0, 0.0, 1.0)
+                    heat_hsv = np.uint8([[[int((1.0 - v_norm) * 120), 240, 255]]])
+                    base_rgb = tuple(int(x) for x in cv2.cvtColor(heat_hsv, cv2.COLOR_HSV2RGB)[0][0])
+                elif color_scheme == "track_spectrum":
+                    hue = int((i * 180 / max(1, N)) % 180)
+                    hsv = np.uint8([[[hue, 230, 255]]])
+                    base_rgb = tuple(int(x) for x in cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)[0][0])
+                else: # radiant_red default
+                    base_rgb = (255, 30, 60)
+
                 pts = [tuple(map(int, trajectories[i, t])) for t in range(start_t, fi + 1)]
                 
-                # Trailing Neon Red Filaments
+                # Trailing Filaments
                 for k in range(len(pts) - 1):
                     v_k = visibilities[i, start_t + k]
                     if v_k >= occlusion_threshold:
-                        alpha = (k + 1) / len(pts)
-                        # Radiant Red Gradient
-                        seg_c = (int(255 * alpha), int(35 * alpha), int(60 * alpha))
+                        alpha = float(k + 1) / float(len(pts))
+                        seg_c = (int(base_rgb[0] * alpha), int(base_rgb[1] * alpha), int(base_rgb[2] * alpha))
                         cv2.line(canvas, pts[k], pts[k+1], seg_c, trail_thickness, cv2.LINE_AA)
 
-                # Active Leading Head: Glowing Red Dot with Bright White Core
+                # Active Leading Head Marker
                 curr_p = tuple(map(int, trajectories[i, fi]))
                 curr_vis = visibilities[i, fi]
                 if curr_vis >= occlusion_threshold:
-                    # Outer red aura
-                    cv2.circle(canvas, curr_p, point_radius + 2, (255, 30, 60), -1, cv2.LINE_AA)
-                    # Inner bright white-hot core
-                    cv2.circle(canvas, curr_p, max(1, point_radius // 2), (255, 240, 240), -1, cv2.LINE_AA)
+                    cv2.circle(canvas, curr_p, point_radius + 2, base_rgb, -1, cv2.LINE_AA)
+                    cv2.circle(canvas, curr_p, max(1, point_radius // 2), (255, 245, 245), -1, cv2.LINE_AA)
 
-            # Soft Bloom Luminescence on Black Background
+            # Luminescence bloom
             bloom = cv2.GaussianBlur(canvas, (17, 17), 0)
             comp = cv2.addWeighted(canvas, 1.0, bloom, 0.6, 0)
             vis_frames.append(comp)
@@ -2543,14 +2558,14 @@ class TAPNetKineticPointTracker:
             "num_frames": num_frames
         }
 
-        print(f"[TAPNetKineticPointTracker] Tracked {N} dancer points across {num_frames} frames in Radiant Red on Black canvas")
+        print(f"[TAPNetKineticPointTracker] Tracked {N} dancer points across {num_frames} frames ({color_scheme} palette)")
         return (out_tensor, tmp_mp4_path, tapnet_data)
 
 
 class KineticTAPNetBrushFusionRenderer:
     """
     Hybrid Kinetic + TAPNet Physical Brush Fusion Renderer.
-    Combines Macro MediaPipe Skeletal ribbons (Neon Green) with Micro TAPNet surface filaments (Radiant Red),
+    Combines Macro MediaPipe Skeletal ribbons with Micro TAPNet surface filaments,
     kinetic particle embers, occlusion pen-lift mechanics, and optical flow streamers into a unified black canvas.
     """
     @classmethod
@@ -2561,8 +2576,8 @@ class KineticTAPNetBrushFusionRenderer:
             },
             "optional": {
                 "tapnet_tracks": (ANY_TYPE, {"tooltip": "TAPNET_TRACK_DATA from TAPNetKineticPointTracker"}),
-                "skeletal_brush_weight": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Intensity multiplier for MediaPipe macro skeletal brushstrokes (Neon Green)"}),
-                "tapnet_filament_weight": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Intensity multiplier for TAPNet micro surface filament ribbons (Radiant Red)"}),
+                "skeletal_brush_weight": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Intensity multiplier for MediaPipe macro skeletal brushstrokes"}),
+                "tapnet_filament_weight": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Intensity multiplier for TAPNet micro surface filament ribbons"}),
                 "tapnet_particle_density": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Density of trailing kinetic particle embers from tracked surface points"}),
                 "temporal_decay": ("FLOAT", {"default": 0.88, "min": 0.50, "max": 0.99, "step": 0.01, "tooltip": "Canvas temporal fade/decay rate per frame"}),
                 "stroke_base_width": ("INT", {"default": 24, "min": 2, "max": 80, "step": 1, "tooltip": "Base width for skeletal ribbons"}),
@@ -2571,7 +2586,20 @@ class KineticTAPNetBrushFusionRenderer:
                 "optical_flow_strength": ("FLOAT", {"default": 0.4, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Intensity of optical flow streamers"}),
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
-                "brush_color_mode": (["green_kinetic_red_tapnet", "kinetic_spectrum", "luminous_white", "warm_amber", "cool_cyan"], {"default": "green_kinetic_red_tapnet", "tooltip": "Color palette preset"}),
+                "brush_color_mode": ([
+                    "white_kinetic_colorful_tapnet",
+                    "white_kinetic_pinkred_tapnet",
+                    "white_kinetic_green_tapnet",
+                    "white_kinetic_blue_tapnet",
+                    "white_kinetic_amber_tapnet",
+                    "green_kinetic_red_tapnet",
+                    "gold_kinetic_cyan_tapnet",
+                    "pink_kinetic_cyan_tapnet",
+                    "kinetic_spectrum",
+                    "luminous_white",
+                    "warm_amber",
+                    "cool_cyan"
+                ], {"default": "white_kinetic_colorful_tapnet", "tooltip": "Color palette preset"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Target frame rate"}),
             }
         }
@@ -2612,7 +2640,7 @@ class KineticTAPNetBrushFusionRenderer:
         optical_flow_strength: float = 0.4,
         glow_strength: float = 0.6,
         occlusion_pen_lift: str = "enable",
-        brush_color_mode: str = "green_kinetic_red_tapnet",
+        brush_color_mode: str = "white_kinetic_colorful_tapnet",
         fps: int = 24
     ):
         if not isinstance(motion_input, dict):
@@ -2625,39 +2653,95 @@ class KineticTAPNetBrushFusionRenderer:
         h = motion_input.get("height", 1280)
         fps = motion_input.get("fps", fps)
 
-        # Color configurations: Green Kinetic Skeletal + Red TAPNet Surface Filaments
-        if brush_color_mode == "green_kinetic_red_tapnet":
-            # Vivid Neon Green Skeletal Ribbons
+        # Dynamic Color Palette Presets
+        is_tapnet_rainbow = False
+
+        if brush_color_mode == "white_kinetic_colorful_tapnet":
+            # Pure Pearl White Kinetic + Rainbow TAPNet
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (1.0, 1.0, 1.0)
+            }
+            is_tapnet_rainbow = True
+            filament_base = (1.0, 1.0, 1.0)
+        elif brush_color_mode in ["white_kinetic_pinkred_tapnet", "white_kinetic_red_tapnet"]:
+            # Pure White Kinetic + Glowing Pink-Red TAPNet
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (1.0, 1.0, 1.0)
+            }
+            filament_base = (1.0, 0.15, 0.45)
+        elif brush_color_mode == "white_kinetic_green_tapnet":
+            # Pure White Kinetic + Neon Emerald Green TAPNet
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (1.0, 1.0, 1.0)
+            }
+            filament_base = (0.1, 1.0, 0.35)
+        elif brush_color_mode == "white_kinetic_blue_tapnet":
+            # Pure White Kinetic + Electric Cyan/Blue TAPNet
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (1.0, 1.0, 1.0)
+            }
+            filament_base = (0.05, 0.8, 1.0)
+        elif brush_color_mode == "white_kinetic_amber_tapnet":
+            # Pure White Kinetic + Rich Golden Amber TAPNet
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (1.0, 1.0, 1.0)
+            }
+            filament_base = (1.0, 0.72, 0.1)
+        elif brush_color_mode == "green_kinetic_red_tapnet":
+            # Neon Green Kinetic + Radiant Crimson Red TAPNet
             skeletal_palette = {
                 15: (0.1, 1.0, 0.35), 16: (0.1, 1.0, 0.35), 27: (0.05, 0.95, 0.4), 28: (0.05, 0.95, 0.4),
                 13: (0.15, 0.9, 0.3), 14: (0.15, 0.9, 0.3), 25: (0.1, 0.85, 0.35), 26: (0.1, 0.85, 0.35),
                 "default": (0.1, 1.0, 0.35)
             }
-            # Radiant Red TAPNet Filaments
             filament_base = (1.0, 0.12, 0.22)
+        elif brush_color_mode == "gold_kinetic_cyan_tapnet":
+            # Golden Amber Kinetic + Electric Cyan TAPNet
+            skeletal_palette = {
+                15: (1.0, 0.75, 0.15), 16: (1.0, 0.75, 0.15), 27: (1.0, 0.6, 0.1), 28: (1.0, 0.6, 0.1),
+                "default": (1.0, 0.75, 0.15)
+            }
+            filament_base = (0.05, 0.85, 1.0)
+        elif brush_color_mode == "pink_kinetic_cyan_tapnet":
+            # Hot Magenta Pink Kinetic + Cyan Blue TAPNet
+            skeletal_palette = {
+                15: (1.0, 0.15, 0.65), 16: (1.0, 0.15, 0.65), 27: (0.9, 0.1, 0.8), 28: (0.9, 0.1, 0.8),
+                "default": (1.0, 0.15, 0.65)
+            }
+            filament_base = (0.05, 0.9, 1.0)
         elif brush_color_mode == "luminous_white":
+            # Monochrome White Calligraphy
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.9, 0.95, 1.0), 28: (0.9, 0.95, 1.0),
                 "default": (0.85, 0.88, 0.95)
             }
             filament_base = (0.9, 0.95, 1.0)
         elif brush_color_mode == "warm_amber":
+            # Flame Golden Amber
             skeletal_palette = {
                 15: (1.0, 0.35, 0.1), 16: (1.0, 0.7, 0.1), 27: (1.0, 0.2, 0.3), 28: (1.0, 0.85, 0.2),
                 "default": (1.0, 0.55, 0.15)
             }
             filament_base = (1.0, 0.65, 0.2)
         elif brush_color_mode == "cool_cyan":
+            # Cyberpunk Cool Cyan / Indigo
             skeletal_palette = {
                 15: (0.0, 0.9, 1.0), 16: (0.1, 0.5, 1.0), 27: (0.4, 0.2, 1.0), 28: (0.0, 1.0, 0.8),
                 "default": (0.1, 0.7, 0.95)
             }
             filament_base = (0.1, 0.85, 1.0)
         else: # kinetic_spectrum
+            # Full Rainbow Spectrum
             skeletal_palette = {
                 15: (1.0, 0.18, 0.45), 16: (0.05, 0.85, 0.95), 27: (0.7, 0.2, 1.0), 28: (1.0, 0.8, 0.1),
                 11: (0.2, 0.9, 0.4), 12: (1.0, 0.45, 0.1), "default": (0.9, 0.9, 0.95)
             }
+            is_tapnet_rainbow = True
             filament_base = (1.0, 0.15, 0.25)
 
         ANCHOR_WEIGHTS = {
@@ -2693,7 +2777,7 @@ class KineticTAPNetBrushFusionRenderer:
 
             stroke_layer = np.zeros((h, w, 3), dtype=np.float32)
 
-            # 1. Macro Skeletal Ribbons (Neon Green)
+            # 1. Macro Skeletal Ribbons
             if skeletal_brush_weight > 0.01:
                 win_start = max(0, t - window_len + 1)
                 for p_idx, anchor_w in ANCHOR_WEIGHTS.items():
@@ -2706,7 +2790,7 @@ class KineticTAPNetBrushFusionRenderer:
                             base_c = skeletal_palette.get(p_idx, skeletal_palette["default"])
 
                             for si in range(len(spline_pts) - 1):
-                                progress = (si + 1) / len(spline_pts)
+                                progress = float(si + 1) / float(len(spline_pts))
                                 spd_factor = np.clip(speeds[si] / (avg_spd + 1e-5), 0.4, 3.0)
                                 raw_w = progress * stroke_base_width * anchor_w * skeletal_brush_weight * (1.0 + (velocity_influence - 1.0) * (spd_factor - 1.0) * 0.5)
                                 w_clamped = int(np.clip(round(raw_w), 2, 60))
@@ -2721,7 +2805,7 @@ class KineticTAPNetBrushFusionRenderer:
                             cv2.circle(stroke_layer, head_pt, head_r, (float(base_c[0]), float(base_c[1]), float(base_c[2])), -1, cv2.LINE_AA)
                             cv2.circle(stroke_layer, head_pt, max(1, head_r // 3), (1.0, 1.0, 1.0), -1, cv2.LINE_AA)
 
-            # 2. Micro Surface Filaments & Embers (Radiant Red)
+            # 2. Micro Surface Filaments & Embers
             if tap_trajectories is not None and tapnet_filament_weight > 0.01 and t < tap_trajectories.shape[1]:
                 tap_win_start = max(0, t - window_len + 1)
                 for i in range(tap_N):
@@ -2733,7 +2817,12 @@ class KineticTAPNetBrushFusionRenderer:
                     if len(p_history) >= 2:
                         fil_pts = self._catmull_rom(p_history, num_samples=4)
                         if len(fil_pts) >= 2:
-                            f_rgb = filament_base
+                            if is_tapnet_rainbow:
+                                hue_angle = (i * 360 / max(1, tap_N)) % 360
+                                f_hsv = np.uint8([[[int(hue_angle / 2), 230, 255]]])
+                                f_rgb = tuple(float(x) / 255.0 for x in cv2.cvtColor(f_hsv, cv2.COLOR_HSV2RGB)[0][0])
+                            else:
+                                f_rgb = filament_base
 
                             for fi_k in range(len(fil_pts) - 1):
                                 prog = float(fi_k + 1) / float(len(fil_pts))
@@ -2741,11 +2830,11 @@ class KineticTAPNetBrushFusionRenderer:
                                 fil_c = (float(f_rgb[0] * prog * vis_t), float(f_rgb[1] * prog * vis_t), float(f_rgb[2] * prog * vis_t))
                                 cv2.line(stroke_layer, fil_pts[fi_k], fil_pts[fi_k+1], fil_c, fw, cv2.LINE_AA)
 
-                            # Leading Point Head: Glowing Red Dot with White Spark Core
+                            # Leading Point Head Marker
                             curr_head = fil_pts[-1]
                             head_rad = max(2, int(filament_width * 1.3))
                             cv2.circle(stroke_layer, curr_head, head_rad + 1, (float(f_rgb[0]), float(f_rgb[1]), float(f_rgb[2])), -1, cv2.LINE_AA)
-                            cv2.circle(stroke_layer, curr_head, max(1, head_rad // 2), (1.0, 0.9, 0.9), -1, cv2.LINE_AA)
+                            cv2.circle(stroke_layer, curr_head, max(1, head_rad // 2), (1.0, 0.95, 0.95), -1, cv2.LINE_AA)
 
                             # Dynamic Particle Embers
                             if tapnet_particle_density > 0.1 and tap_velocities is not None:
@@ -2754,7 +2843,7 @@ class KineticTAPNetBrushFusionRenderer:
                                     ember_offset = np.random.uniform(-10, 10, size=2).astype(int)
                                     ember_pt = (curr_head[0] + ember_offset[0], curr_head[1] + ember_offset[1])
                                     if 0 <= ember_pt[0] < w and 0 <= ember_pt[1] < h:
-                                        cv2.circle(stroke_layer, ember_pt, 2, (1.0, 0.4, 0.2), -1, cv2.LINE_AA)
+                                        cv2.circle(stroke_layer, ember_pt, 2, (float(f_rgb[0]), float(f_rgb[1]), float(f_rgb[2])), -1, cv2.LINE_AA)
 
             canvas = np.maximum(canvas, stroke_layer)
 
@@ -2781,7 +2870,7 @@ class KineticTAPNetBrushFusionRenderer:
         out_writer.release()
 
         out_tensor = torch.from_numpy(np.stack(rendered_frames, axis=0).astype(np.float32) / 255.0)
-        print(f"[KineticTAPNetBrushFusionRenderer] Rendered {len(rendered_frames)} Green+Red dual contrast brush frames to {tmp_mp4_path}")
+        print(f"[KineticTAPNetBrushFusionRenderer] Rendered {len(rendered_frames)} fused brush frames ({brush_color_mode}) to {tmp_mp4_path}")
         return (out_tensor, tmp_mp4_path)
 
 
