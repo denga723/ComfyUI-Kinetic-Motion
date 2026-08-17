@@ -3024,6 +3024,147 @@ class KineticTAPNetBrushFusionRenderer:
         return (out_tensor, tmp_mp4_path, dynamic_prompt)
 
 
+class KineticDualComparisonViewer:
+    """
+    Dual Video Comparison & Side-by-Side Synchronizer.
+    Combines Stage 6 Fused Kinetic Brushstrokes and Final Stylized Omni Artwork
+    into a unified side-by-side comparison video with live inline preview.
+    """
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "stage6_fused_brushstrokes": ("IMAGE", {"tooltip": "Stage 6 Fused Kinetic + TAPNet Brushstrokes video"}),
+                "final_stylized_artwork": ("IMAGE", {"tooltip": "Final Stylized Artwork video from Gemini Omni"}),
+            },
+            "optional": {
+                "layout": (["side_by_side_horizontal", "stacked_vertical"], {"default": "side_by_side_horizontal"}),
+                "show_labels": (["enable", "disable"], {"default": "enable"}),
+                "label_left": ("STRING", {"default": "Stage 6: Fused Brushstrokes"}),
+                "label_right": ("STRING", {"default": "Final Stylized Artwork"}),
+                "frame_rate": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
+                "save_output": ("BOOLEAN", {"default": True}),
+                "filename_prefix": ("STRING", {"default": "Dual_Kinetic_Comparison"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("comparison_video", "video_path")
+    OUTPUT_NODE = True
+    FUNCTION = "create_comparison"
+    CATEGORY = "kinetic_motion"
+    DESCRIPTION = "Combines Stage 6 Fused Brushstrokes and Final Stylized Video into a unified side-by-side comparison video."
+
+    def create_comparison(
+        self,
+        stage6_fused_brushstrokes: torch.Tensor,
+        final_stylized_artwork: torch.Tensor,
+        layout: str = "side_by_side_horizontal",
+        show_labels: str = "enable",
+        label_left: str = "Stage 6: Fused Brushstrokes",
+        label_right: str = "Final Stylized Artwork",
+        frame_rate: int = 24,
+        format: str = "mp4",
+        save_output: bool = True,
+        filename_prefix: str = "Dual_Kinetic_Comparison"
+    ):
+        if stage6_fused_brushstrokes is None or final_stylized_artwork is None:
+            raise ValueError("[KineticDualComparisonViewer] Both stage6 and final stylized inputs are required.")
+
+        num_frames = min(stage6_fused_brushstrokes.shape[0], final_stylized_artwork.shape[0])
+        h1, w1 = stage6_fused_brushstrokes.shape[1], stage6_fused_brushstrokes.shape[2]
+        h2, w2 = final_stylized_artwork.shape[1], final_stylized_artwork.shape[2]
+
+        target_h = max(h1, h2)
+        target_w = int(w1 * (target_h / h1))
+        target_w2 = int(w2 * (target_h / h2))
+
+        comp_frames = []
+        pil_frames = []
+
+        for fi in range(num_frames):
+            f1_np = (stage6_fused_brushstrokes[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            f2_np = (final_stylized_artwork[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+
+            f1_resized = cv2.resize(f1_np, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
+            f2_resized = cv2.resize(f2_np, (target_w2, target_h), interpolation=cv2.INTER_LANCZOS4)
+
+            if show_labels == "enable":
+                for f_img, lbl in [(f1_resized, label_left), (f2_resized, label_right)]:
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    scale = 0.55
+                    thick = 1
+                    (txt_w, txt_h), baseline = cv2.getTextSize(lbl, font, scale, thick)
+                    pad = 8
+                    box_coords = ((12, 12), (12 + txt_w + pad * 2, 12 + txt_h + pad * 2))
+                    sub_img = f_img[box_coords[0][1]:box_coords[1][1], box_coords[0][0]:box_coords[1][0]]
+                    if sub_img.shape[0] > 0 and sub_img.shape[1] > 0:
+                        dark_rect = np.zeros_like(sub_img)
+                        cv2.addWeighted(sub_img, 0.25, dark_rect, 0.75, 0, sub_img)
+                        f_img[box_coords[0][1]:box_coords[1][1], box_coords[0][0]:box_coords[1][0]] = sub_img
+                        cv2.rectangle(f_img, box_coords[0], box_coords[1], (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.putText(f_img, lbl, (12 + pad, 12 + txt_h + pad - 2), font, scale, (255, 255, 255), thick, cv2.LINE_AA)
+
+            if layout == "stacked_vertical":
+                comb = np.concatenate([f1_resized, f2_resized], axis=0)
+            else:
+                comb = np.concatenate([f1_resized, f2_resized], axis=1)
+
+            comp_frames.append(comb)
+            pil_frames.append(Image.fromarray(comb))
+
+        out_tensor = torch.from_numpy(np.stack(comp_frames, axis=0).astype(np.float32) / 255.0)
+
+        output_dir = self.output_dir if save_output else self.temp_dir
+        type_str = "output" if save_output else "temp"
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, comp_frames[0].shape[1], comp_frames[0].shape[0]
+        )
+
+        duration_ms = max(1, int(1000.0 / max(1, frame_rate)))
+        h_c, w_c = comp_frames[0].shape[:2]
+        if w_c % 2 != 0: w_c -= 1
+        if h_c % 2 != 0: h_c -= 1
+
+        ui_results = []
+        if format in ["animated_webp", "image/webp"]:
+            file_name = f"{filename}_{counter:05d}_.webp"
+            saved_path = os.path.join(full_output_folder, file_name)
+            pil_frames[0].save(saved_path, save_all=True, append_images=pil_frames[1:], duration=duration_ms, loop=0, quality=90)
+            ui_results.append({"filename": file_name, "subfolder": subfolder, "type": type_str, "format": "image/webp"})
+        elif format in ["gif", "image/gif"]:
+            file_name = f"{filename}_{counter:05d}_.gif"
+            saved_path = os.path.join(full_output_folder, file_name)
+            pil_frames[0].save(saved_path, save_all=True, append_images=pil_frames[1:], duration=duration_ms, loop=0)
+            ui_results.append({"filename": file_name, "subfolder": subfolder, "type": type_str, "format": "image/gif"})
+        else: # mp4
+            file_name = f"{filename}_{counter:05d}_.mp4"
+            saved_path = os.path.join(full_output_folder, file_name)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(saved_path, fourcc, float(frame_rate), (w_c, h_c))
+            for cf in comp_frames:
+                if cf.shape[1] != w_c or cf.shape[0] != h_c:
+                    cf = cv2.resize(cf, (w_c, h_c))
+                out.write(cv2.cvtColor(cf, cv2.COLOR_RGB2BGR))
+            out.release()
+
+            preview_webp_name = f"{filename}_{counter:05d}_preview.webp"
+            preview_path = os.path.join(full_output_folder, preview_webp_name)
+            pil_frames[0].save(preview_path, save_all=True, append_images=pil_frames[1:], duration=duration_ms, loop=0, quality=85)
+            ui_results.append({"filename": preview_webp_name, "subfolder": subfolder, "type": type_str, "format": "image/webp"})
+
+        print(f"[KineticDualComparisonViewer] Saved side-by-side comparison to {saved_path}")
+        return {
+            "ui": {"images": ui_results},
+            "result": (out_tensor, saved_path)
+        }
+
+
 NODE_CLASS_MAPPINGS = {
     "GeminiProModel": GeminiProModel,
     "GeminiOmniModel": GeminiOmniModel,
@@ -3037,7 +3178,9 @@ NODE_CLASS_MAPPINGS = {
     "KineticMotionToBrushRenderer": KineticMotionToBrushRenderer,
     "TAPNetKineticPointTracker": TAPNetKineticPointTracker,
     "KineticTAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer,
-    "TAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer
+    "TAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer,
+    "KineticDualComparisonViewer": KineticDualComparisonViewer,
+    "DualVideoComparisonViewer": KineticDualComparisonViewer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -3053,5 +3196,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KineticMotionToBrushRenderer": "Kinetic Motion-to-Brush Renderer",
     "TAPNetKineticPointTracker": "TAPNet Point Tracker (Tracking Any Point)",
     "KineticTAPNetBrushFusionRenderer": "Kinetic + TAPNet Brush Fusion Renderer",
-    "TAPNetBrushFusionRenderer": "TAPNet Brush Fusion Renderer"
+    "TAPNetBrushFusionRenderer": "TAPNet Brush Fusion Renderer",
+    "KineticDualComparisonViewer": "Kinetic Dual Comparison Viewer (Stage 6 + Final Art)",
+    "DualVideoComparisonViewer": "Dual Video Comparison Viewer"
 }
