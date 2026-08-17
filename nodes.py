@@ -2292,11 +2292,11 @@ class TAPNetKineticPointTracker:
             "optional": {
                 "mask_or_images": (ANY_TYPE, {"tooltip": "Human segmentation mask or KINETIC_MOTION_DATA bundle from Extractor"}),
                 "num_points": ("INT", {"default": 128, "min": 16, "max": 1024, "step": 16, "tooltip": "Number of persistent physical surface points to track"}),
-                "grid_sampling": (["dancer_silhouette", "salient_features", "uniform_grid"], {"default": "dancer_silhouette", "tooltip": "Strategy for query point initialization"}),
+                "grid_sampling": (["dancer_silhouette", "mask_weighted", "salient_features", "uniform_grid"], {"default": "dancer_silhouette", "tooltip": "Strategy for query point initialization"}),
                 "trail_history": ("INT", {"default": 24, "min": 2, "max": 60, "step": 1, "tooltip": "Temporal history trail length in frames"}),
                 "point_radius": ("INT", {"default": 5, "min": 1, "max": 16, "step": 1, "tooltip": "Visualized point marker radius in pixels"}),
                 "trail_thickness": ("INT", {"default": 3, "min": 1, "max": 12, "step": 1, "tooltip": "Visualized point trajectory trail line thickness"}),
-                "color_scheme": (["radiant_red", "track_spectrum", "velocity_heat", "luminescent_white"], {"default": "radiant_red", "tooltip": "Color palette for tracked points and ribbons"}),
+                "color_scheme": (["radiant_red", "track_spectrum", "velocity_heat", "luminescent_white", "cyan_amber"], {"default": "radiant_red", "tooltip": "Color palette for tracked points and ribbons"}),
                 "occlusion_threshold": ("FLOAT", {"default": 0.40, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Visibility confidence cutoff for occlusion detection"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Output playback frame rate"}),
             }
