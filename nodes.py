@@ -2566,7 +2566,8 @@ class KineticTAPNetBrushFusionRenderer:
     """
     Hybrid Kinetic + TAPNet Physical Brush Fusion Renderer.
     Combines Macro MediaPipe Skeletal ribbons with Micro TAPNet surface filaments,
-    kinetic particle embers, occlusion pen-lift mechanics, and optical flow streamers into a unified black canvas.
+    kinetic particle embers, occlusion pen-lift mechanics, optical flow streamers,
+    and automatic dynamic prompt generation for Gemini Omni.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -2587,25 +2588,32 @@ class KineticTAPNetBrushFusionRenderer:
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
                 "brush_color_mode": ([
+                    "green_kinetic_red_tapnet",
                     "white_kinetic_colorful_tapnet",
                     "white_kinetic_pinkred_tapnet",
+                    "white_kinetic_red_tapnet",
                     "white_kinetic_green_tapnet",
                     "white_kinetic_blue_tapnet",
                     "white_kinetic_amber_tapnet",
-                    "green_kinetic_red_tapnet",
+                    "white_kinetic_white_tapnet",
+                    "green_kinetic_colorful_tapnet",
                     "gold_kinetic_cyan_tapnet",
                     "pink_kinetic_cyan_tapnet",
+                    "blue_kinetic_amber_tapnet",
+                    "amber_kinetic_amber_tapnet",
+                    "cyan_kinetic_cyan_tapnet",
+                    "colorful_kinetic_colorful_tapnet",
                     "kinetic_spectrum",
                     "luminous_white",
                     "warm_amber",
                     "cool_cyan"
-                ], {"default": "white_kinetic_colorful_tapnet", "tooltip": "Color palette preset"}),
+                ], {"default": "green_kinetic_red_tapnet", "tooltip": "Color palette preset structure: <kinetic_color>_kinetic_<tapnet_color>_tapnet"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Target frame rate"}),
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("fused_brush_video", "video_path")
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING")
+    RETURN_NAMES = ("fused_brush_video", "video_path", "dynamic_prompt")
     FUNCTION = "render_fused_brush_strokes"
     CATEGORY = "kinetic_motion"
 
@@ -2626,6 +2634,137 @@ class KineticTAPNetBrushFusionRenderer:
                 curve.append((int(round(pt[0])), int(round(pt[1]))))
         return curve
 
+    def _generate_dynamic_prompt(self, brush_color_mode: str) -> str:
+        prompts_map = {
+            "green_kinetic_red_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the vibrant neon green kinetic ribbons as dynamic, sweeping strokes of rich emerald and cadmium green impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single radiant glowing red tracking dot and filament as an autonomous droplet of glistening, thick crimson and vermilion oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the green structural ribbons and red surface filaments self-paint across the scene, blending rich green and crimson paint "
+                "against the pure dark void with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_colorful_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single radiant multi-colored tracking dot and filament as an autonomous droplet of glistening rainbow oil paint "
+                "(crimson, cobalt, gold, emerald, violet) that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the white structural ribbons and colorful surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_pinkred_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single glowing pink and red tracking dot and filament as an autonomous droplet of glistening magenta, crimson, and rose oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the white structural ribbons and pink-red surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_red_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single glowing red tracking dot and filament as an autonomous droplet of glistening crimson and vermilion oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the white structural ribbons and red surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_green_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single vibrant green tracking dot and filament as an autonomous droplet of glistening emerald and viridian oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the white structural ribbons and emerald green surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_blue_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single electric blue tracking dot and filament as an autonomous droplet of glistening ultramarine, cerulean, and azure oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the white structural ribbons and blue surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_amber_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single golden amber tracking dot and filament as an autonomous droplet of glistening cadmium gold and warm ochre oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the white structural ribbons and golden surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
+            "white_kinetic_white_tapnet": (
+                "Masterpiece self-moving animated monochrome oil painting on deep black canvas. "
+                "Interpret both the kinetic ribbons and tracking dots as pure luminous strokes and droplets of thick titanium white impasto oil paint "
+                "with visible palette-knife textures, wet brush ridges, and heavy physical relief. "
+                "As the dancer moves, the white calligraphy ribbons and delicate white surface filaments self-paint across the scene against the pure dark void "
+                "with dramatic studio lighting, ultra-detailed fine art."
+            ),
+            "green_kinetic_colorful_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the vibrant green kinetic ribbons as dynamic, sweeping strokes of rich emerald and jade impasto oil paint. "
+                "Interpret every single tracking dot and filament as an autonomous droplet of glistening multi-colored rainbow oil paint. "
+                "As the dancer moves, the green structural ribbons and rainbow surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+            "gold_kinetic_cyan_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the rich golden amber kinetic ribbons as dynamic, sweeping strokes of warm gold, cadmium yellow, and ochre impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single electric cyan tracking dot and filament as an autonomous droplet of glistening turquoise, teal, and cyan oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the golden structural ribbons and cyan surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+            "pink_kinetic_cyan_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the hot magenta pink kinetic ribbons as dynamic, sweeping strokes of vivid magenta, rose, and pink impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single electric cyan tracking dot and filament as an autonomous droplet of glistening turquoise, aqua, and cyan oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the pink structural ribbons and cyan surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+            "blue_kinetic_amber_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the deep cobalt blue kinetic ribbons as dynamic, sweeping strokes of rich ultramarine and navy impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single golden amber tracking dot and filament as an autonomous droplet of glistening cadmium gold and warm amber oil paint "
+                "that blooms and swirls into fine wet filaments with glowing embers. "
+                "As the dancer moves, the blue structural ribbons and golden surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+            "amber_kinetic_amber_tapnet": (
+                "Masterpiece self-moving animated warm oil painting on deep black canvas. "
+                "Interpret both the kinetic ribbons and tracking dots as rich strokes and droplets of warm golden amber, flame orange, and ochre impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "As the dancer moves, the fiery ribbons and warm filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+            "cyan_kinetic_cyan_tapnet": (
+                "Masterpiece self-moving animated cool oil painting on deep black canvas. "
+                "Interpret both the kinetic ribbons and tracking dots as electric strokes and droplets of cyan, turquoise, and deep indigo impasto oil paint "
+                "with visible palette-knife textures and heavy physical relief. "
+                "As the dancer moves, the cool luminous ribbons and cyan filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+            "colorful_kinetic_colorful_tapnet": (
+                "Masterpiece self-moving animated multi-color oil painting on deep black canvas. "
+                "Interpret the kinetic ribbons and all tracking dots as a vibrant spectrum of glistening impasto oil paint (crimson, gold, emerald, cobalt, violet) "
+                "with rich 3D palette-knife textures, glistening wet paint ridges, and dynamic glowing particle embers. "
+                "As the dancer moves, the rainbow ribbons and multi-colored filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
+            ),
+        }
+        # Fallback aliases
+        alias_map = {
+            "luminous_white": "white_kinetic_white_tapnet",
+            "kinetic_spectrum": "colorful_kinetic_colorful_tapnet",
+            "warm_amber": "amber_kinetic_amber_tapnet",
+            "cool_cyan": "cyan_kinetic_cyan_tapnet"
+        }
+        effective_mode = alias_map.get(brush_color_mode, brush_color_mode)
+        return prompts_map.get(effective_mode, prompts_map["green_kinetic_red_tapnet"])
+
     def render_fused_brush_strokes(
         self,
         motion_input: Any,
@@ -2640,7 +2779,7 @@ class KineticTAPNetBrushFusionRenderer:
         optical_flow_strength: float = 0.4,
         glow_strength: float = 0.6,
         occlusion_pen_lift: str = "enable",
-        brush_color_mode: str = "white_kinetic_colorful_tapnet",
+        brush_color_mode: str = "green_kinetic_red_tapnet",
         fps: int = 24
     ):
         if not isinstance(motion_input, dict):
@@ -2656,87 +2795,94 @@ class KineticTAPNetBrushFusionRenderer:
         # Dynamic Color Palette Presets
         is_tapnet_rainbow = False
 
-        if brush_color_mode == "white_kinetic_colorful_tapnet":
-            # Pure Pearl White Kinetic + Rainbow TAPNet
+        if brush_color_mode in ["white_kinetic_white_tapnet", "luminous_white"]:
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (0.95, 0.98, 1.0)
+            }
+            filament_base = (0.95, 0.98, 1.0)
+        elif brush_color_mode == "white_kinetic_colorful_tapnet":
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
                 "default": (1.0, 1.0, 1.0)
             }
             is_tapnet_rainbow = True
             filament_base = (1.0, 1.0, 1.0)
-        elif brush_color_mode in ["white_kinetic_pinkred_tapnet", "white_kinetic_red_tapnet"]:
-            # Pure White Kinetic + Glowing Pink-Red TAPNet
+        elif brush_color_mode in ["white_kinetic_pinkred_tapnet", "white_kinetic_pink_tapnet"]:
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
                 "default": (1.0, 1.0, 1.0)
             }
             filament_base = (1.0, 0.15, 0.45)
+        elif brush_color_mode == "white_kinetic_red_tapnet":
+            skeletal_palette = {
+                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
+                "default": (1.0, 1.0, 1.0)
+            }
+            filament_base = (1.0, 0.12, 0.22)
         elif brush_color_mode == "white_kinetic_green_tapnet":
-            # Pure White Kinetic + Neon Emerald Green TAPNet
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
                 "default": (1.0, 1.0, 1.0)
             }
             filament_base = (0.1, 1.0, 0.35)
         elif brush_color_mode == "white_kinetic_blue_tapnet":
-            # Pure White Kinetic + Electric Cyan/Blue TAPNet
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
                 "default": (1.0, 1.0, 1.0)
             }
             filament_base = (0.05, 0.8, 1.0)
         elif brush_color_mode == "white_kinetic_amber_tapnet":
-            # Pure White Kinetic + Rich Golden Amber TAPNet
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
                 "default": (1.0, 1.0, 1.0)
             }
             filament_base = (1.0, 0.72, 0.1)
         elif brush_color_mode == "green_kinetic_red_tapnet":
-            # Neon Green Kinetic + Radiant Crimson Red TAPNet
             skeletal_palette = {
                 15: (0.1, 1.0, 0.35), 16: (0.1, 1.0, 0.35), 27: (0.05, 0.95, 0.4), 28: (0.05, 0.95, 0.4),
                 13: (0.15, 0.9, 0.3), 14: (0.15, 0.9, 0.3), 25: (0.1, 0.85, 0.35), 26: (0.1, 0.85, 0.35),
                 "default": (0.1, 1.0, 0.35)
             }
             filament_base = (1.0, 0.12, 0.22)
+        elif brush_color_mode == "green_kinetic_colorful_tapnet":
+            skeletal_palette = {
+                15: (0.1, 1.0, 0.35), 16: (0.1, 1.0, 0.35), 27: (0.05, 0.95, 0.4), 28: (0.05, 0.95, 0.4),
+                "default": (0.1, 1.0, 0.35)
+            }
+            is_tapnet_rainbow = True
+            filament_base = (1.0, 1.0, 1.0)
         elif brush_color_mode == "gold_kinetic_cyan_tapnet":
-            # Golden Amber Kinetic + Electric Cyan TAPNet
             skeletal_palette = {
                 15: (1.0, 0.75, 0.15), 16: (1.0, 0.75, 0.15), 27: (1.0, 0.6, 0.1), 28: (1.0, 0.6, 0.1),
                 "default": (1.0, 0.75, 0.15)
             }
             filament_base = (0.05, 0.85, 1.0)
         elif brush_color_mode == "pink_kinetic_cyan_tapnet":
-            # Hot Magenta Pink Kinetic + Cyan Blue TAPNet
             skeletal_palette = {
                 15: (1.0, 0.15, 0.65), 16: (1.0, 0.15, 0.65), 27: (0.9, 0.1, 0.8), 28: (0.9, 0.1, 0.8),
                 "default": (1.0, 0.15, 0.65)
             }
             filament_base = (0.05, 0.9, 1.0)
-        elif brush_color_mode == "luminous_white":
-            # Monochrome White Calligraphy
+        elif brush_color_mode == "blue_kinetic_amber_tapnet":
             skeletal_palette = {
-                15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.9, 0.95, 1.0), 28: (0.9, 0.95, 1.0),
-                "default": (0.85, 0.88, 0.95)
+                15: (0.1, 0.4, 1.0), 16: (0.1, 0.4, 1.0), 27: (0.05, 0.3, 0.9), 28: (0.05, 0.3, 0.9),
+                "default": (0.1, 0.4, 1.0)
             }
-            filament_base = (0.9, 0.95, 1.0)
-        elif brush_color_mode == "warm_amber":
-            # Flame Golden Amber
+            filament_base = (1.0, 0.72, 0.1)
+        elif brush_color_mode in ["amber_kinetic_amber_tapnet", "warm_amber"]:
             skeletal_palette = {
                 15: (1.0, 0.35, 0.1), 16: (1.0, 0.7, 0.1), 27: (1.0, 0.2, 0.3), 28: (1.0, 0.85, 0.2),
                 "default": (1.0, 0.55, 0.15)
             }
             filament_base = (1.0, 0.65, 0.2)
-        elif brush_color_mode == "cool_cyan":
-            # Cyberpunk Cool Cyan / Indigo
+        elif brush_color_mode in ["cyan_kinetic_cyan_tapnet", "cool_cyan"]:
             skeletal_palette = {
                 15: (0.0, 0.9, 1.0), 16: (0.1, 0.5, 1.0), 27: (0.4, 0.2, 1.0), 28: (0.0, 1.0, 0.8),
                 "default": (0.1, 0.7, 0.95)
             }
             filament_base = (0.1, 0.85, 1.0)
-        else: # kinetic_spectrum
-            # Full Rainbow Spectrum
+        else: # colorful_kinetic_colorful_tapnet / kinetic_spectrum
             skeletal_palette = {
                 15: (1.0, 0.18, 0.45), 16: (0.05, 0.85, 0.95), 27: (0.7, 0.2, 1.0), 28: (1.0, 0.8, 0.1),
                 11: (0.2, 0.9, 0.4), 12: (1.0, 0.45, 0.1), "default": (0.9, 0.9, 0.95)
@@ -2870,8 +3016,12 @@ class KineticTAPNetBrushFusionRenderer:
         out_writer.release()
 
         out_tensor = torch.from_numpy(np.stack(rendered_frames, axis=0).astype(np.float32) / 255.0)
+        
+        # Generate matched dynamic prompt based on the chosen color mode
+        dynamic_prompt = self._generate_dynamic_prompt(brush_color_mode)
+
         print(f"[KineticTAPNetBrushFusionRenderer] Rendered {len(rendered_frames)} fused brush frames ({brush_color_mode}) to {tmp_mp4_path}")
-        return (out_tensor, tmp_mp4_path)
+        return (out_tensor, tmp_mp4_path, dynamic_prompt)
 
 
 NODE_CLASS_MAPPINGS = {
