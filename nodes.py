@@ -1,53 +1,92 @@
-"""
-ComfyUI-Kinetic-Motion
-======================
-High-precision kinetic motion curve extraction, MediaPipe 3D pose tracking,
-dense optical flow kinematics, and expressive physical brushstroke rendering for ComfyUI.
-
-Nodes included:
-- Google Kinetic Motion Curve Extractor (KineticMotionCurveExtractor)
-- Kinetic Motion-to-Brush Renderer (KineticMotionToBrushRenderer)
-- Kinetic Video Combine & Preview (KineticVideoCombine)
-"""
-
 import os
-import urllib.request
-import tempfile
+import asyncio
+import torch
+from dataclasses import dataclass, field
 from typing import List, Any, Optional, Dict, Union
+import copy
+import base64
+from io import BytesIO
 import numpy as np
 from PIL import Image
-import cv2
-import torch
 
-try:
-    import folder_paths
-except ImportError:
-    class DummyFolderPaths:
-        base_path = os.getcwd()
-        def get_output_directory(self):
-            out = os.path.join(self.base_path, "output")
-            os.makedirs(out, exist_ok=True)
-            return out
-        def get_temp_directory(self):
-            tmp = os.path.join(self.base_path, "temp")
-            os.makedirs(tmp, exist_ok=True)
-            return tmp
-        def get_save_image_path(self, prefix, outdir, w, h):
-            os.makedirs(outdir, exist_ok=True)
-            return outdir, prefix, 1, "", prefix
-    folder_paths = DummyFolderPaths()
+import aiohttp
+import json
+import cv2
+import folder_paths
+import google.auth
+from google.auth.transport.requests import Request
+
+def tensor_to_base64(tensor):
+    # tensor is [H, W, C] in ComfyUI standard
+    if len(tensor.shape) == 4:
+        tensor = tensor[0]
+    i = 255. * tensor.cpu().numpy()
+    img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+    buffered = BytesIO()
+    img.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+def base64_to_tensor(b64_str):
+    try:
+        image_data = base64.b64decode(b64_str)
+        image = Image.open(BytesIO(image_data))
+        image = image.convert("RGB")
+        image = np.array(image).astype(np.float32) / 255.0
+        tensor = torch.from_numpy(image)[None,]
+        return tensor
+    except Exception as e:
+        print(f"Failed to decode base64 image: {e}")
+        return None
+
+# Optional: define a helper to get GCP access token
+def get_gcp_token():
+    credentials, project_id = google.auth.default()
+    credentials.refresh(Request())
+    return credentials.token, project_id
 
 
 class AnyType(str):
-    """ComfyUI wildcard type to allow connections to/from any socket."""
     def __ne__(self, __value: object) -> bool:
         return False
 
 ANY_TYPE = AnyType("*")
 
+@dataclass
+class GeminiPayload:
+    text: str = ""
+    images: List[torch.Tensor] = field(default_factory=list)
+    videos: List[str] = field(default_factory=list) # Store file paths
+
+@dataclass
+class GeminiStream:
+    payloads: List[GeminiPayload] = field(default_factory=list)
+
+def get_image_batch_length(raw_val):
+    if raw_val is None:
+        return 0
+    if isinstance(raw_val, str):
+        if raw_val.strip('\'"').lower().endswith((".mp4", ".mov", ".webm")):
+            return 1
+        return 0
+    if isinstance(raw_val, torch.Tensor):
+        if len(raw_val.shape) == 3:
+            return 1
+        elif len(raw_val.shape) >= 4:
+            shape = raw_val.shape
+            num_images = 1
+            for dim in shape[:-3]:
+                num_images *= dim
+            return num_images
+    elif isinstance(raw_val, GeminiStream):
+        return len(raw_val.payloads)
+    elif isinstance(raw_val, list):
+        length = 0
+        for t in raw_val:
+            length += get_image_batch_length(t)
+        return length
+    return 0
 
 def get_video_file_path(val: Any) -> Optional[str]:
-    """Helper to extract a video file path from various ComfyUI video loader outputs."""
     if val is None:
         return None
     if isinstance(val, str) and (val.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv", ".gif")) or os.path.exists(val.strip('\'"'))):
@@ -63,35 +102,1601 @@ def get_video_file_path(val: Any) -> Optional[str]:
         f = getattr(val, "_VideoFromFile__file")
         if isinstance(f, str) and (os.path.exists(f) or f.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv"))):
             return f
-    for attr in ["file", "path", "file_path", "video_path", "filename", "video"]:
+    for attr in ["file", "path", "file_path", "video_path", "filename"]:
         if hasattr(val, attr) and isinstance(getattr(val, attr), str):
             f = getattr(val, attr)
             if os.path.exists(f) or f.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv")):
                 return f
     return None
 
+def _parse_input_to_stream(inp: Any, split_batches=True) -> GeminiStream:
+    stream = GeminiStream()
+    if isinstance(inp, GeminiStream):
+        return inp
+    v_path = get_video_file_path(inp)
+    if v_path:
+        stream.payloads.append(GeminiPayload(videos=[v_path]))
+        return stream
+    if isinstance(inp, str):
+        stream.payloads.append(GeminiPayload(text=inp))
+    elif isinstance(inp, torch.Tensor):
+        if len(inp.shape) == 3:
+            stream.payloads.append(GeminiPayload(images=[inp.unsqueeze(0)]))
+        elif len(inp.shape) >= 4:
+            if split_batches:
+                shape = inp.shape
+                H, W, C = shape[-3], shape[-2], shape[-1]
+                flat_batch = inp.reshape(-1, H, W, C)
+                for i in range(flat_batch.shape[0]):
+                    stream.payloads.append(GeminiPayload(images=[flat_batch[i].unsqueeze(0)]))
+            else:
+                stream.payloads.append(GeminiPayload(images=[inp]))
+    elif isinstance(inp, list):
+        for item in inp:
+            stream.payloads.extend(_parse_input_to_stream(item, split_batches=split_batches).payloads)
+    return stream
 
-class KineticMotionCurveExtractor:
-    """
-    Extracts multi-stage kinetic motion curves, MediaPipe 3D pose landmarks,
-    human silhouette segmentation, and dense optical flow fields from video input.
-    """
+
+
+class GeminiAuthConfig:
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "video_or_images": (ANY_TYPE, {"tooltip": "Video file path, video loader output, or IMAGE batch tensor [B, H, W, C]"}),
+                "project_id": ("STRING", {"default": "creativelab-prototypes"}),
+                "location": (["us-central1", "us", "eu", "global", "us-east1", "us-west1", "europe-west1", "europe-west4", "asia-northeast1", "asia-southeast1"],),
+                "service_account_json_path": ("STRING", {"default": ""}),
             },
             "optional": {
-                "spline_type": (["catmull_rom_spline", "bezier_spline", "linear"], {"default": "catmull_rom_spline", "tooltip": "Mathematical interpolation method for trajectory ribbons"}),
-                "trail_window": ("INT", {"default": 20, "min": 2, "max": 60, "step": 1, "tooltip": "Temporal trail history window length (frames)"}),
-                "stroke_base_thickness": ("INT", {"default": 18, "min": 2, "max": 50, "step": 1, "tooltip": "Base thickness of spline ribbons"}),
-                "speed_to_width_factor": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 5.0, "step": 0.1, "tooltip": "Width modulation scaling based on instantaneous joint velocity"}),
-                "speed_to_brightness_factor": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Luminescence scaling based on instantaneous joint velocity"}),
-                "dense_optical_flow": (["enable", "disable"], {"default": "enable", "tooltip": "Compute dense optical flow vector field and streamlines"}),
-                "temporal_smoothing": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "EMA smoothing factor for pose landmark jitter suppression"}),
-                "model_complexity": (["full", "heavy", "lite"], {"default": "full", "tooltip": "MediaPipe Pose Landmarker model complexity"}),
-                "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Target frame rate"}),
+                "api_key": ("STRING", {"default": "", "multiline": False})
+            }
+        }
+    RETURN_TYPES = ("GEMINI_AUTH",)
+    RETURN_NAMES = ("auth_config",)
+    FUNCTION = "setup"
+    CATEGORY = "Gemini Enterprise/Config"
+    
+    def setup(self, project_id, location, service_account_json_path, api_key=""):
+        if service_account_json_path:
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_json_path
+        return ({"project_id": project_id, "location": location[0] if isinstance(location, list) else location, "api_key": api_key},)
+# Define Model Node
+class GeminiProModel:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "stream": (ANY_TYPE,),
+                "model_name": (["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-pro-exp-02-05", "gemini-1.5-pro", "gemini-1.5-flash"],)
+            },
+            "optional": {
+                "auth_config": ("GEMINI_AUTH",)
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "IMAGE", "GEMINI_RESPONSE")
+    RETURN_NAMES = ("text", "images", "response")
+    FUNCTION = "generate"
+    CATEGORY = "Gemini Enterprise/Models"
+    INPUT_IS_LIST = True
+
+    def generate(self, stream, model_name, auth_config=None):
+        model_name = model_name[0]
+        unified_stream = _parse_input_to_stream(stream)
+        
+        project_id = auth_config[0].get("project_id", "creativelab-prototypes") if auth_config else "creativelab-prototypes"
+        location = auth_config[0].get("location", "us-central1") if auth_config else "us-central1"
+        key = (auth_config[0].get("api_key", "") if auth_config else "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+
+        token = None
+        if not key:
+            try:
+                token, default_project = get_gcp_token()
+                project_id = project_id or default_project
+            except Exception as e:
+                raise RuntimeError(
+                    f"Authentication Failed: No Google Cloud Application Default Credentials (ADC) or API Key found ({e}).\n\n"
+                    "To fix this, choose one of the following:\n"
+                    "1. In the GeminiAuthConfig node, enter your Gemini API Key in the 'api_key' field.\n"
+                    "2. In the GeminiAuthConfig node, enter the path to your Service Account JSON key file in 'service_account_json_path'.\n"
+                    "3. In your terminal, run: `gcloud auth application-default login`"
+                )
+            
+        if not project_id:
+            project_id = "creativelab-prototypes"
+
+        if key:
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+        else:
+            if location in ["us", "eu"]:
+                hostname = f"aiplatform.{location}.rep.googleapis.com"
+            elif location == "global":
+                hostname = "aiplatform.googleapis.com"
+            else:
+                hostname = f"{location}-aiplatform.googleapis.com"
+            endpoint = f"https://{hostname}/v1/projects/{project_id}/locations/{location}/publishers/google/models/{model_name}:generateContent"
+
+        async def fetch_gemini(payload: GeminiPayload, session: aiohttp.ClientSession):
+            headers = {
+                "Content-Type": "application/json"
+            }
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            # Multimodal payload structure for Gemini REST API
+            parts = []
+            print(f"DEBUG: fetch_gemini called with payload having {len(payload.images)} images, {len(payload.videos)} videos, and text: {payload.text!r}")
+            for vid_path in payload.videos:
+                try:
+                    vid_clean = vid_path.strip('\'"')
+                    if os.path.exists(vid_clean):
+                        import base64
+                        with open(vid_clean, "rb") as f:
+                            b64_video = base64.b64encode(f.read()).decode("utf-8")
+                        mime_type = "video/mp4"
+                        if vid_clean.lower().endswith(".webm"):
+                            mime_type = "video/webm"
+                        elif vid_clean.lower().endswith(".mov"):
+                            mime_type = "video/quicktime"
+                        parts.append({
+                            "inlineData": {
+                                "mimeType": mime_type,
+                                "data": b64_video
+                            }
+                        })
+                except Exception as e:
+                    print(f"Error encoding video file for Gemini Pro: {e}")
+
+            for img_tensor in payload.images:
+                try:
+                    # If multiple images are packed in one tensor [N, H, W, C]
+                    if len(img_tensor.shape) == 4 and img_tensor.shape[0] > 1:
+                        print(f"DEBUG: Encoding batch of {img_tensor.shape[0]} images")
+                        for i in range(img_tensor.shape[0]):
+                            b64_img = tensor_to_base64(img_tensor[i:i+1])
+                            parts.append({
+                                "inlineData": {
+                                    "mimeType": "image/jpeg",
+                                    "data": b64_img
+                                }
+                            })
+                    else:
+                        print(f"DEBUG: Encoding single image tensor of shape {img_tensor.shape}")
+                        b64_img = tensor_to_base64(img_tensor)
+                        parts.append({
+                            "inlineData": {
+                                "mimeType": "image/jpeg",
+                                "data": b64_img
+                            }
+                        })
+                except Exception as e:
+                    print(f"Error encoding image: {e}")
+                    
+            if payload.text:
+                parts.append({"text": payload.text})
+            elif len(parts) == 0:
+                parts.append({"text": " "})
+
+            data = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": parts
+                    }
+                ]
+            }
+            print(f"DEBUG: Sending data to Gemini API: {len(parts)} parts")
+            
+            try:
+                async with session.post(endpoint, headers=headers, json=data) as response:
+                    if response.status == 200:
+                        resp_json = await response.json()
+                        text_content = ""
+                        image_tensors = []
+                        try:
+                            for candidate in resp_json.get("candidates", []):
+                                content = candidate.get("content", {})
+                                parts = content.get("parts", [])
+                                for part in parts:
+                                    if "text" in part:
+                                        text_content += part["text"]
+                                    if "inlineData" in part:
+                                        mime = part["inlineData"].get("mimeType", "")
+                                        b64 = part["inlineData"].get("data", "")
+                                        if b64:
+                                            t = base64_to_tensor(b64)
+                                            if t is not None:
+                                                image_tensors.append(t)
+                            return (text_content, image_tensors, resp_json)
+                        except (KeyError, IndexError) as e:
+                            return (f"Unexpected response format: {resp_json}", [], resp_json)
+                    else:
+                        error_text = await response.text()
+                        return (f"API Error {response.status}: {error_text}", [], {"error": error_text})
+            except Exception as e:
+                return (f"Request Error: {e}", [], {"error": str(e)})
+
+        async def process_batch():
+            async with aiohttp.ClientSession() as session:
+                tasks = [fetch_gemini(p, session) for p in unified_stream.payloads]
+                return await asyncio.gather(*tasks)
+
+        import threading
+        
+        results = [None]
+        
+        def run_async():
+            # Wait, asyncio.new_event_loop() requires closing if not used anymore, but threading handles it OK for now
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results[0] = loop.run_until_complete(process_batch())
+            finally:
+                loop.close()
+
+        t = threading.Thread(target=run_async)
+        t.start()
+        t.join()
+
+        all_texts = []
+        all_images = []
+        all_responses = []
+        
+        for res in results[0]:
+            if res[0]:
+                all_texts.append(res[0])
+            
+            # Pack images for this response into a single batch tensor
+            res_imgs = res[1]
+            if res_imgs:
+                shape = res_imgs[0].shape
+                if all(img.shape == shape for img in res_imgs):
+                    final_image = torch.cat(res_imgs, dim=0)
+                else:
+                    import torch.nn.functional as F
+                    H, W = shape[1], shape[2]
+                    resized_images = []
+                    for img in res_imgs:
+                        if img.shape != shape:
+                            img_perm = img.permute(0, 3, 1, 2)
+                            img_resized = F.interpolate(img_perm, size=(H, W), mode="bilinear")
+                            img = img_resized.permute(0, 2, 3, 1)
+                        resized_images.append(img)
+                    final_image = torch.cat(resized_images, dim=0)
+                all_images.append(final_image)
+            else:
+                all_images.append(torch.zeros((1, 512, 512, 3), dtype=torch.float32))
+
+            all_responses.append(res[2])
+        
+        final_text = "\n\n".join(all_texts)
+        final_image_tensor = torch.cat(all_images, dim=0) if all_images else None
+            
+        return (final_text, final_image_tensor, all_responses)
+
+class GeminiOmniModel:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "stream": (ANY_TYPE,),
+            },
+            "optional": {
+                "gcs_bucket": ("STRING", {"default": ""}),
+                "auth_config": ("GEMINI_AUTH",)
+            },
+            "hidden": {
+                "omni_config": ("STRING", {"default": "{}"}),
+            }
+        }
+        
+    RETURN_TYPES = ("STRING", "IMAGE", "GEMINI_RESPONSE")
+    RETURN_NAMES = ("text", "images", "response")
+    FUNCTION = "generate"
+    CATEGORY = "Gemini Enterprise/Models"
+    INPUT_IS_LIST = True
+
+    def generate(self, stream, gcs_bucket="", auth_config=None, omni_config="{}"):
+        import urllib.request
+        import urllib.error
+        import tempfile
+        import cv2
+        import torch
+        import os
+        import numpy as np
+        import json
+
+        gcs_bucket = gcs_bucket[0] if isinstance(gcs_bucket, list) else gcs_bucket
+        if isinstance(omni_config, list):
+            omni_config = omni_config[0]
+            
+        config = {}
+        try:
+            if omni_config and isinstance(omni_config, str):
+                config = json.loads(omni_config)
+        except Exception as e:
+            print(f"[GeminiOmniModel] Error parsing omni_config: {e}")
+            
+        model_name = config.get("model_name", "gemini-omni-flash-preview")
+        # Ensure only supported video generation models are passed to the Interactions API
+        VALID_OMNI_MODELS = ["gemini-omni-flash-preview", "veo-2.0-generate-001"]
+        if not model_name or model_name not in VALID_OMNI_MODELS:
+            print(f"[GeminiOmniModel] Notice: '{model_name}' is not supported on the video Interactions endpoint. Auto-defaulting to 'gemini-omni-flash-preview'.")
+            model_name = "gemini-omni-flash-preview"
+
+        ar = config.get("aspect_ratio", "16:9")
+        task = config.get("task", "text_to_video")
+        duration = int(config.get("duration", 3))
+        delivery = config.get("delivery", "base64")
+        prefix_text = config.get("prefix_text", "")
+        suffix_text = config.get("suffix_text", "")
+        
+        unified_stream = _parse_input_to_stream(stream, split_batches=False)
+        
+        project_id = auth_config[0].get("project_id", "creativelab-prototypes") if auth_config else "creativelab-prototypes"
+        location = auth_config[0].get("location", "us-central1") if auth_config else "us-central1"
+        key = (auth_config[0].get("api_key", "") if auth_config else "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+
+        token = None
+        if not key:
+            try:
+                token, default_project = get_gcp_token()
+                project_id = project_id or default_project
+            except Exception as e:
+                raise RuntimeError(
+                    f"Authentication Failed: No Google Cloud Application Default Credentials (ADC) or API Key found ({e}).\n\n"
+                    "To fix this, choose one of the following:\n"
+                    "1. In the GeminiAuthConfig node, enter your Gemini API Key in the 'api_key' field.\n"
+                    "2. In the GeminiAuthConfig node, enter the path to your Service Account JSON key file in 'service_account_json_path'.\n"
+                    "3. In your terminal, run: `gcloud auth application-default login`"
+                )
+
+        if not project_id:
+            project_id = "creativelab-prototypes"
+
+        all_texts = []
+        video_tensors = []
+        all_responses = []
+
+        async def fetch_omni(payload, session):
+            inputs_payload = []
+            
+            # Add videos from file paths if present
+            for vid_path in payload.videos:
+                try:
+                    vid_clean = vid_path.strip('\'"')
+                    if os.path.exists(vid_clean):
+                        import base64
+                        import subprocess
+                        import tempfile
+                        
+                        # Ensure standard mp4 encoding for Google API compatibility
+                        if not vid_clean.lower().endswith(".mp4"):
+                            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_f:
+                                tmp_mp4 = tmp_f.name
+                            converted = False
+                            if os.path.exists("/usr/bin/avconvert"):
+                                try:
+                                    res = subprocess.run(["/usr/bin/avconvert", "--source", vid_clean, "--output", tmp_mp4, "--preset", "PresetHighestQuality"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                    if res.returncode == 0 and os.path.exists(tmp_mp4) and os.path.getsize(tmp_mp4) > 0:
+                                        vid_clean = tmp_mp4
+                                        converted = True
+                                except Exception:
+                                    pass
+                            if not converted:
+                                try:
+                                    cap = cv2.VideoCapture(vid_clean)
+                                    fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+                                    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                                    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                                    out = cv2.VideoWriter(tmp_mp4, fourcc, fps, (w, h))
+                                    while True:
+                                        ret, frame = cap.read()
+                                        if not ret:
+                                            break
+                                        out.write(frame)
+                                    cap.release()
+                                    out.release()
+                                    if os.path.exists(tmp_mp4) and os.path.getsize(tmp_mp4) > 0:
+                                        vid_clean = tmp_mp4
+                                except Exception:
+                                    pass
+
+                        with open(vid_clean, "rb") as f:
+                            b64_video = base64.b64encode(f.read()).decode("utf-8")
+                        inputs_payload.append({
+                            "type": "video",
+                            "data": b64_video,
+                            "mime_type": "video/mp4"
+                        })
+                except Exception as e:
+                    print(f"Error encoding video file for Omni: {e}")
+
+            # Add images if present
+            for img_tensor in payload.images:
+                try:
+                    if len(img_tensor.shape) == 4 and img_tensor.shape[0] > 1:
+                        # Multiple individual reference images in batch
+                        for i in range(img_tensor.shape[0]):
+                            b64_img = tensor_to_base64(img_tensor[i:i+1])
+                            inputs_payload.append({
+                                "type": "image",
+                                "data": b64_img,
+                                "mime_type": "image/jpeg"
+                            })
+                    else:
+                        b64_img = tensor_to_base64(img_tensor)
+                        inputs_payload.append({
+                            "type": "image",
+                            "data": b64_img,
+                            "mime_type": "image/jpeg"
+                        })
+                except Exception as e:
+                    print(f"Error encoding image for Omni: {e}")
+
+            has_video_input = any(p.get("type") == "video" for p in inputs_payload)
+
+            # Process explicit image & video reference roles
+            image_roles = config.get("image_roles", {})
+            sources_clauses = []
+            guiding_instructions = []
+            ref_clauses = []
+
+            img_count = 0
+            vid_count = 0
+            first_frame_id = None
+            ref_img_ids = []
+            vid_ids = []
+
+            if task == "video_editing" or task == "edit":
+                # Video-to-Video mode: Video1 is the primary source video
+                img_count = 0
+                vid_count = 0
+                for p in inputs_payload:
+                    if p.get("type") == "video":
+                        vid_count += 1
+                        vid_id = f"Video{vid_count}"
+                        vid_ids.append(vid_id)
+                    elif p.get("type") == "image":
+                        img_count += 1
+                        img_id = f"Image{img_count}"
+                        ref_img_ids.append(img_id)
+                        ref_idx = len(ref_clauses)
+                        ref_clauses.append(f"<IMAGE_REF_{ref_idx}>@{img_id}")
+
+                if vid_ids:
+                    sources_clauses.append(f"[# Sources @{vid_ids[0]}]")
+                    guiding_instructions.append(f"Perform video style transfer: Strictly preserve the camera movement, motion trajectory, actions, structure, and timing from {vid_ids[0]}.")
+
+                if ref_clauses:
+                    ref_str = " ".join(ref_clauses)
+                    sources_clauses.append(f"[# References {ref_str}]")
+                    ref_ids_str = ", ".join(ref_img_ids)
+                    guiding_instructions.append(f"Re-render and style the scene according to the visual appearance, color palette, texture, and aesthetic style of {ref_ids_str}.")
+            elif task != "text_to_video":
+                # Image-to-Video mode: Image1 is the first frame, Video1 is motion reference
+                for p in inputs_payload:
+                    if p.get("type") == "image":
+                        img_count += 1
+                        img_id = f"Image{img_count}"
+                        default_role = "first-frame" if img_count == 1 else "reference"
+                        role = image_roles.get(img_id, default_role)
+                        
+                        if role == "first-frame" and not first_frame_id:
+                            first_frame_id = img_id
+                            sources_clauses.append(f"[# Sources <FIRST_FRAME>@{img_id}]")
+                            guiding_instructions.append(f"Use {img_id} as the initial starting frame.")
+                        else:
+                            ref_idx = len(ref_img_ids)
+                            ref_img_ids.append(img_id)
+                            ref_clauses.append(f"<IMAGE_REF_{ref_idx}>@{img_id}")
+                    elif p.get("type") == "video":
+                        vid_count += 1
+                        vid_id = f"Video{vid_count}"
+                        vid_ids.append(vid_id)
+                        v_ref_idx = len(vid_ids) - 1
+                        ref_clauses.append(f"<VIDEO_REF_{v_ref_idx}>@{vid_id}")
+
+                if ref_clauses:
+                    ref_str = " ".join(ref_clauses)
+                    sources_clauses.append(f"[# References {ref_str}]")
+
+                if ref_img_ids:
+                    ref_ids_str = ", ".join(ref_img_ids)
+                    guiding_instructions.append(f"Use {ref_ids_str} as visual style, texture, and character references.")
+
+                if vid_ids:
+                    vid_ids_str = ", ".join(vid_ids)
+                    guiding_instructions.append(f"Replicate and match the exact motion trajectory, camera movement, character actions, physical dynamics, and animation timing from {vid_ids_str}.")
+
+            # Add text prompt (duration + prefix + payload.text + suffix)
+            combined_text_parts = []
+            if sources_clauses:
+                combined_text_parts.extend(sources_clauses)
+            if duration:
+                combined_text_parts.append(f"[0-{duration}s]")
+            if prefix_text:
+                combined_text_parts.append(prefix_text)
+            if payload.text:
+                combined_text_parts.append(payload.text)
+            if suffix_text:
+                combined_text_parts.append(suffix_text)
+            if guiding_instructions:
+                combined_text_parts.extend(guiding_instructions)
+                
+            if combined_text_parts:
+                final_text = " ".join(combined_text_parts)
+                inputs_payload.append({
+                    "type": "text",
+                    "text": final_text
+                })
+
+            mapped_task = task
+            if task == "video_editing":
+                mapped_task = "edit"
+            
+            response_format = {
+                "type": "video"
+            }
+            if ar and mapped_task != "edit" and mapped_task != "video_editing":
+                response_format["aspect_ratio"] = ar
+                
+            if delivery == "uri":
+                import uuid
+                if gcs_bucket:
+                    response_format["delivery"] = "uri"
+                    obj_name = f"omni_{uuid.uuid4().hex}.mp4"
+                    response_format["gcs_uri"] = f"gs://{gcs_bucket}/{obj_name}"
+                else:
+                    print("WARNING: URI delivery requested but no GCS bucket provided. Falling back to base64.")
+
+            req_body = {
+                "model": model_name,
+                "input": inputs_payload,
+                "response_format": response_format,
+                "generation_config": {
+                    "video_config": {
+                        "task": mapped_task
+                    }
+                }
+            }
+
+            import json
+            log_body = {
+                "model": req_body["model"],
+                "input": [{"type": p.get("type"), "mime_type": p.get("mime_type"), "data": "<base64_hidden>" if "data" in p else p.get("text") or p.get("uri")} for p in req_body.get("input", [])],
+                "response_format": req_body.get("response_format"),
+                "generation_config": req_body.get("generation_config")
+            }
+            print(f"OMNI REQUEST PAYLOAD: {json.dumps(log_body, indent=2)}")
+
+            if model_name == "veo-2.0-generate-001":
+                # Google Vertex AI Veo 2.0 Video Generation Pipeline
+                veo_location = location if location not in ["global", "us", "eu"] else "us-central1"
+                veo_url = f"https://{veo_location}-aiplatform.googleapis.com/v1/projects/{project_id}/locations/{veo_location}/publishers/google/models/veo-2.0-generate-001:predictLongRunning"
+                
+                prompt_text = final_text or payload.text or ""
+                instance = {"prompt": prompt_text}
+                
+                # Image-to-video / starting frame support for Veo
+                if payload.images:
+                    try:
+                        img_tensor = payload.images[0]
+                        b64_img = tensor_to_base64(img_tensor)
+                        instance["image"] = {
+                            "bytesBase64Encoded": b64_img,
+                            "mimeType": "image/jpeg"
+                        }
+                    except Exception as e:
+                        print(f"[GeminiOmniModel] Veo image encoding error: {e}")
+                
+                veo_params = {
+                    "aspectRatio": ar if ar in ["16:9", "9:16", "1:1"] else "16:9",
+                    "sampleCount": 1,
+                    "durationSeconds": max(5, min(duration, 8)),
+                    "personGeneration": "allow_adult",
+                    "fps": 24
+                }
+                if gcs_bucket and delivery == "uri":
+                    veo_params["storageUri"] = f"gs://{gcs_bucket}"
+                    
+                veo_body = {
+                    "instances": [instance],
+                    "parameters": veo_params
+                }
+                
+                headers = {"Content-Type": "application/json"}
+                if token:
+                    headers["Authorization"] = f"Bearer {token}"
+                elif key:
+                    veo_url += f"?key={key}"
+                else:
+                    return (None, None, None, {"error": "Authentication failed. No token or key."})
+                    
+                try:
+                    async with session.post(veo_url, headers=headers, json=veo_body) as response:
+                        if response.status == 200:
+                            op_json = await response.json()
+                            op_name = op_json.get("name")
+                            if not op_name:
+                                return ("[Veo 2 Error]: No operation returned.", None, None, op_json)
+                            
+                            poll_url = f"https://{veo_location}-aiplatform.googleapis.com/v1/{op_name}"
+                            done = False
+                            video_uri = None
+                            video_b64 = None
+                            poll_json = op_json
+                            for _ in range(60): # poll up to 5 minutes
+                                await asyncio.sleep(5)
+                                async with session.get(poll_url, headers=headers) as poll_resp:
+                                    if poll_resp.status == 200:
+                                        poll_json = await poll_resp.json()
+                                        if poll_json.get("done"):
+                                            done = True
+                                            if "error" in poll_json:
+                                                return (f"[Veo 2 Error]: {poll_json['error']}", None, None, poll_json)
+                                            resp_val = poll_json.get("response", {})
+                                            vids = resp_val.get("generatedVideos", []) or resp_val.get("videos", [])
+                                            for v in vids:
+                                                vid_obj = v.get("video", {})
+                                                if "bytesBase64Encoded" in vid_obj:
+                                                    video_b64 = vid_obj["bytesBase64Encoded"]
+                                                elif "uri" in vid_obj:
+                                                    video_uri = vid_obj["uri"]
+                                                elif "gcsUri" in vid_obj:
+                                                    video_uri = vid_obj["gcsUri"]
+                                            break
+                            if not done:
+                                return ("[Veo 2 Error]: Video generation timed out after 5 minutes.", None, None, poll_json)
+                            return (f"[Generated video with Veo 2: {prompt_text}]", video_b64, video_uri, poll_json)
+                        else:
+                            error_text = await response.text()
+                            print(f"VEO API ERROR {response.status}: {error_text}")
+                            user_msg = f"[Veo 2.0 API Error ({response.status})]: {error_text}"
+                            if response.status == 404:
+                                user_msg = (
+                                    f"[Veo 2.0 Notice (404)]:\n"
+                                    f"• Model 'veo-2.0-generate-001' is not enabled or allowlisted for project '{project_id}' in region '{veo_location}'.\n"
+                                    f"• Recommendation: Select 'gemini-omni-flash-preview' in the Gemini Omni Model node (active and verified on your project)."
+                                )
+                            return (user_msg, None, None, {"error": error_text, "code": response.status, "friendly_message": user_msg})
+                except Exception as e:
+                    print(f"VEO INTERNAL EXCEPTION: {str(e)}")
+                    return (f"[Error]: {str(e)}", None, None, {"error": str(e)})
+
+            # Default: Gemini Omni Flash Video via Global Interactions API
+            headers = {"Content-Type": "application/json"}
+            if token:
+                url = f"https://aiplatform.googleapis.com/v1beta1/projects/{project_id}/locations/global/interactions"
+                headers["Authorization"] = f"Bearer {token}"
+            elif key:
+                url = f"https://generativelanguage.googleapis.com/v1beta/interactions?key={key}"
+            else:
+                print("OMNI AUTH ERROR: No token or key in fetch_omni")
+                return (None, None, None, {"error": "Authentication failed. No token or key."})
+
+            try:
+                async with session.post(url, headers=headers, json=req_body) as response:
+                    if response.status == 200:
+                        resp_json = await response.json()
+                        video_uri = None
+                        video_b64 = None
+                        text_parts = []
+                        steps = resp_json.get("steps", [])
+                        for step in steps:
+                            for content in step.get("content", []):
+                                if "text" in content:
+                                    text_parts.append(content.get("text", ""))
+                                if content.get("type") == "video":
+                                    if "uri" in content:
+                                        video_uri = content.get("uri")
+                                    if "data" in content:
+                                        video_b64 = content.get("data")
+                        
+                        combined_text = "\n".join(text_parts) if text_parts else f"[Generated video for prompt: {payload.text}]"
+                        return (combined_text, video_b64, video_uri, resp_json)
+                    else:
+                        error_text = await response.text()
+                        print(f"OMNI API ERROR {response.status}: {error_text}")
+                        user_msg = f"[API Error ({response.status})]: {error_text}"
+                        if "unsupported model interaction" in error_text.lower():
+                            user_msg = (
+                                f"[Gemini Omni Model Error]: The selected model '{model_name}' does not support video generation/editing via the Interactions API.\n"
+                                f"• For Video Generation & Stylization (Video-to-Video / Image-to-Video), please select 'gemini-omni-flash-preview'.\n"
+                                f"• If you want text analysis / multimodal reasoning with '{model_name}', use the 'Gemini Execution Node' instead."
+                            )
+                        return (user_msg, None, None, {"error": error_text, "code": response.status, "friendly_message": user_msg})
+            except Exception as e:
+                print(f"OMNI INTERNAL EXCEPTION: {str(e)}")
+                return (f"[Error]: {str(e)}", None, None, {"error": str(e)})
+
+        async def process_batch():
+            async with aiohttp.ClientSession() as session:
+                tasks = [fetch_omni(p, session) for p in unified_stream.payloads]
+                return await asyncio.gather(*tasks)
+
+        import threading
+        results = [None]
+        
+        def run_async():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results[0] = loop.run_until_complete(process_batch())
+            finally:
+                loop.close()
+
+        t = threading.Thread(target=run_async)
+        t.start()
+        t.join()
+
+        all_texts = []
+        video_tensors = []
+        all_responses = []
+        
+        for res_tuple in results[0]:
+            if not res_tuple:
+                continue
+            combined_text, video_b64, video_uri, resp_json = res_tuple
+            
+            if combined_text:
+                all_texts.append(combined_text)
+            if resp_json:
+                all_responses.append(resp_json)
+                
+            tensor_appended = False
+            if video_uri or video_b64:
+                import tempfile
+                import cv2
+                import urllib.request
+                with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
+                    tmp_path = tmp_file.name
+                    
+                    if video_b64:
+                        import base64
+                        tmp_file.write(base64.b64decode(video_b64))
+                    elif video_uri:
+                        v_headers = {}
+                        if token:
+                            v_headers["Authorization"] = f"Bearer {token}"
+                        try:
+                            v_req = urllib.request.Request(video_uri, headers=v_headers)
+                            with urllib.request.urlopen(v_req) as v_resp:
+                                tmp_file.write(v_resp.read())
+                        except Exception as e:
+                            print(f"Failed to download video URI: {e}")
+
+                try:
+                    cap = cv2.VideoCapture(tmp_path)
+                    frames = []
+                    while cap.isOpened():
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        frame_float = frame_rgb.astype("float32") / 255.0
+                        frames.append(frame_float)
+                    cap.release()
+                    
+                    if frames:
+                        tensor = torch.from_numpy(np.stack(frames, axis=0))
+                        video_tensors.append(tensor)
+                        tensor_appended = True
+                except Exception as e:
+                    print(f"Failed to decode video: {e}")
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                        
+            if not tensor_appended:
+                # Fallback if no frames were read or error occurred
+                h = 720 if ar == "16:9" else 1280
+                w = 1280 if ar == "16:9" else 720
+                if "error" in resp_json:
+                    import math
+                    f_count = 24
+                    fallback = torch.zeros((f_count, h, w, 3))
+                    for f in range(f_count):
+                        color_val = (math.sin(f / f_count * math.pi * 2) + 1) / 2
+                        fallback[f, :, :, 0] = color_val # Pulsing Red
+                        fallback[f, :, :, 1] = 0.2
+                        fallback[f, :, :, 2] = 1.0 - color_val
+                    video_tensors.append(fallback)
+                else:
+                    video_tensors.append(torch.zeros((1, h, w, 3)))
+
+        final_text = "\n\n".join(all_texts)
+        if not video_tensors:
+            h = 720 if ar == "16:9" else 1280
+            w = 1280 if ar == "16:9" else 720
+            final_image_tensor = torch.zeros((1, h, w, 3))
+        else:
+            final_image_tensor = torch.cat(video_tensors, dim=0)
+
+        return (final_text, final_image_tensor, all_responses)
+
+
+class GeminiVideoCombine:
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "images": ("IMAGE", {"tooltip": "Batch of image frames from Gemini Omni / video node"}),
+                "frame_rate": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1, "tooltip": "Playback frame rate (FPS)"}),
+                "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
+                "save_output": ("BOOLEAN", {"default": True, "tooltip": "Save output to ComfyUI output directory"}),
+                "filename_prefix": ("STRING", {"default": "GeminiVideo", "tooltip": "Prefix for saved video/animation files"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("images", "video_path")
+    OUTPUT_NODE = True
+    FUNCTION = "combine_video"
+    CATEGORY = "Gemini Enterprise/Video"
+    DESCRIPTION = "Combines image frames into a playable video/animation with inline preview."
+
+    def combine_video(self, images, frame_rate=24, format="mp4", save_output=True, filename_prefix="GeminiVideo"):
+        if images is None or len(images.shape) < 4 or images.shape[0] == 0:
+            return {"ui": {"images": []}, "result": (images, "")}
+
+        output_dir = self.output_dir if save_output else self.temp_dir
+        type_str = "output" if save_output else "temp"
+
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, images[0].shape[1], images[0].shape[0]
+        )
+
+        h, w = images.shape[1], images.shape[2]
+        num_frames = images.shape[0]
+
+        pil_frames = []
+        for idx in range(num_frames):
+            frame_np = (images[idx].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            pil_frames.append(Image.fromarray(frame_np))
+
+        duration_ms = max(1, int(1000.0 / max(1, frame_rate)))
+        saved_file_path = ""
+        ui_results = []
+
+        if format == "animated_webp":
+            file_name = f"{filename}_{counter:05d}_.webp"
+            saved_file_path = os.path.join(full_output_folder, file_name)
+            pil_frames[0].save(
+                saved_file_path,
+                save_all=True,
+                append_images=pil_frames[1:],
+                duration=duration_ms,
+                loop=0,
+                quality=92,
+                method=4
+            )
+            ui_results.append({
+                "filename": file_name,
+                "subfolder": subfolder,
+                "type": type_str,
+                "format": "image/webp"
+            })
+        elif format == "gif":
+            file_name = f"{filename}_{counter:05d}_.gif"
+            saved_file_path = os.path.join(full_output_folder, file_name)
+            pil_frames[0].save(
+                saved_file_path,
+                save_all=True,
+                append_images=pil_frames[1:],
+                duration=duration_ms,
+                loop=0
+            )
+            ui_results.append({
+                "filename": file_name,
+                "subfolder": subfolder,
+                "type": type_str,
+                "format": "image/gif"
+            })
+        else:  # mp4
+            file_name = f"{filename}_{counter:05d}_.mp4"
+            saved_file_path = os.path.join(full_output_folder, file_name)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(saved_file_path, fourcc, float(frame_rate), (w, h))
+            for idx in range(num_frames):
+                frame_bgr = cv2.cvtColor((images[idx].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
+                out.write(frame_bgr)
+            out.release()
+
+            preview_webp_name = f"{filename}_{counter:05d}_preview.webp"
+            preview_path = os.path.join(full_output_folder, preview_webp_name)
+            pil_frames[0].save(
+                preview_path,
+                save_all=True,
+                append_images=pil_frames[1:],
+                duration=duration_ms,
+                loop=0,
+                quality=85,
+                method=3
+            )
+            ui_results.append({
+                "filename": preview_webp_name,
+                "subfolder": subfolder,
+                "type": type_str,
+                "format": "image/webp"
+            })
+
+        return {
+            "ui": {"images": ui_results},
+            "result": (images, saved_file_path)
+        }
+
+
+class GeminiMultimodalPreview:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "response": (ANY_TYPE,)
+            }
+        }
+
+    RETURN_TYPES = ()
+    OUTPUT_NODE = True
+    FUNCTION = "preview"
+    CATEGORY = "Gemini Enterprise/Preview"
+
+    def preview(self, response):
+        return {"ui": {"gemini_response": response if isinstance(response, list) else [response]}}
+
+class GeminiJobBatcher:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "jobs": ("INT", {"default": 0, "min": 0, "max": 100}),
+            },
+            "hidden": {
+                "stream_config": ("STRING", {"default": "[]"}),
+            }
+        }
+
+    RETURN_TYPES = ("GEMINI_STREAM",)
+    RETURN_NAMES = ("stream",)
+    FUNCTION = "process_jobs"
+    CATEGORY = "Gemini Enterprise/Routing"
+    OUTPUT_NODE = True
+
+    @staticmethod
+    def _get_target_size(first_w, first_h, aspect_ratio, all_sizes):
+        RATIOS = {"16:9": (16, 9), "1:1": (1, 1), "9:16": (9, 16)}
+
+        if aspect_ratio == "guess":
+            avg_ratio = sum(w / max(h, 1) for w, h in all_sizes) / len(all_sizes)
+            aspect_ratio = min(RATIOS, key=lambda k: abs(RATIOS[k][0] / RATIOS[k][1] - avg_ratio))
+
+        rw, rh = RATIOS[aspect_ratio]
+        target_ratio = rw / rh
+
+        # Ensure first_h and first_w are non-zero
+        first_w = max(first_w, 1)
+        first_h = max(first_h, 1)
+
+        if first_w / first_h > target_ratio:
+            target_h = first_h
+            target_w = int(first_h * target_ratio)
+        else:
+            target_w = first_w
+            target_h = int(first_w / target_ratio)
+
+        return max(target_w, 1), max(target_h, 1)
+
+    @staticmethod
+    def _load_video_frames(filepath):
+        import cv2
+        import torch
+        import numpy as np
+        
+        filepath = filepath.strip('\'"')
+        cap = cv2.VideoCapture(filepath)
+        frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(frame)
+        cap.release()
+        
+        if not frames:
+            return None
+            
+        frames_np = np.array(frames).astype(np.float32) / 255.0
+        return torch.from_numpy(frames_np)
+
+    def _process_image_stream(self, tensor_batch, config, target_len):
+        import torch
+        import torch.nn.functional as F
+        import random
+        import os
+
+        mode = config.get("mode", "images")
+
+        v_path = get_video_file_path(tensor_batch)
+        if v_path and mode != "images":
+            return [v_path for _ in range(target_len)]
+        if v_path and mode == "images":
+            tensor_batch = self._load_video_frames(v_path)
+            if tensor_batch is None:
+                return [None] * target_len
+
+        if mode == "video" and isinstance(tensor_batch, torch.Tensor) and len(tensor_batch.shape) >= 4 and tensor_batch.shape[0] > 1:
+            return [tensor_batch for _ in range(target_len)]
+
+        # Gather all images as a list of 3D [H, W, C] tensors
+        tensors = []
+        if isinstance(tensor_batch, torch.Tensor):
+            if len(tensor_batch.shape) == 3:
+                tensors.append(tensor_batch)
+            elif len(tensor_batch.shape) >= 4:
+                shape = tensor_batch.shape
+                H, W, C = shape[-3], shape[-2], shape[-1]
+                flat_batch = tensor_batch.reshape(-1, H, W, C)
+                for i in range(flat_batch.shape[0]):
+                    tensors.append(flat_batch[i])
+        elif isinstance(tensor_batch, list):
+            for t in tensor_batch:
+                if isinstance(t, torch.Tensor):
+                    if len(t.shape) == 3:
+                        tensors.append(t)
+                    elif len(t.shape) >= 4:
+                        shape = t.shape
+                        H, W, C = shape[-3], shape[-2], shape[-1]
+                        flat_batch = t.reshape(-1, H, W, C)
+                        for i in range(flat_batch.shape[0]):
+                            tensors.append(flat_batch[i])
+
+        if not tensors:
+            return []
+
+        if mode == "video":
+            full_video_tensor = torch.stack(tensors, dim=0)
+            return [full_video_tensor for _ in range(target_len)]
+
+        aspect = config.get("aspect", "guess")
+        cycle = config.get("cycle", "iterate")
+        imgs_per_job = int(config.get("imgs_per_job", 1))
+        idx_offset = int(config.get("index", 0))
+        if target_len == 1 and imgs_per_job == 1 and len(tensors) > 1 and cycle != "fixed":
+            imgs_per_job = len(tensors)
+
+        all_sizes = [(t.shape[1], t.shape[0]) for t in tensors] 
+        first_w, first_h = all_sizes[0]
+        target_w, target_h = self._get_target_size(first_w, first_h, aspect, all_sizes)
+
+        processed_images = []
+        for img in tensors:
+            src_h, src_w, _ = img.shape
+            
+            if src_w != target_w or src_h != target_h:
+                img_t = img.permute(2, 0, 1).unsqueeze(0) 
+                scale = max(target_w / max(src_w, 1), target_h / max(src_h, 1))
+                new_w = int(src_w * scale)
+                new_h = int(src_h * scale)
+                img_t = F.interpolate(img_t, size=(new_h, new_w), mode="bilinear", align_corners=False)
+                
+                left = (new_w - target_w) // 2
+                top = (new_h - target_h) // 2
+                img_t = img_t[:, :, top:top+target_h, left:left+target_w]
+                img = img_t.squeeze(0).permute(1, 2, 0) 
+            
+            processed_images.append(img)
+            
+        N = len(processed_images)
+        job_images = []
+        
+        for job_i in range(target_len):
+            job_imgs = []
+            for j in range(imgs_per_job):
+                if cycle == "fixed":
+                    idx = idx_offset + j
+                    if idx >= N: idx = N - 1 
+                elif cycle == "random":
+                    idx = random.randint(0, N - 1)
+                else: 
+                    idx = (job_i * imgs_per_job + j) % N
+                job_imgs.append(processed_images[idx].unsqueeze(0))
+            
+            if job_imgs:
+                job_images.append(torch.cat(job_imgs, dim=0))
+            else:
+                job_images.append(None)
+                
+        return job_images
+
+    def process_jobs(self, stream_config="[]", jobs=0, **kwargs):
+        jobs = jobs[0] if isinstance(jobs, list) and jobs else (jobs if isinstance(jobs, int) else 0)
+        import json
+        import os
+        import io
+        import base64
+        import torch
+        import random
+        
+        stream_config_str = stream_config[0] if isinstance(stream_config, list) and stream_config else stream_config
+        if not isinstance(stream_config_str, str):
+            stream_config_str = "[]"
+            
+        try:
+            stream_config = json.loads(stream_config_str)
+        except Exception:
+            stream_config = []
+            
+        streams = {}
+        for key, value in kwargs.items():
+            import re
+            m = re.match(r"^(?:text|image|video|input)_stream_(\d+)$", key)
+            if m:
+                idx = int(m.group(1))
+                stype = "IMAGE" if (key.startswith("image_") or key.startswith("video_")) else "STRING"
+                # If tensor or video, ensure stype is IMAGE
+                if isinstance(value, torch.Tensor) or get_video_file_path(value) is not None:
+                    stype = "IMAGE"
+                streams[idx] = {"val": value, "type": stype}
+                    
+        processed_text_streams = []
+        processed_image_streams = {}
+        
+        if not stream_config and streams:
+            for idx in sorted(streams.keys()):
+                stream_config.append({
+                    "id": idx,
+                    "type": streams[idx]["type"],
+                    "delim": "\\n",
+                    "prefix": "",
+                    "suffix": "",
+                    "muted": False
+                })
+
+        for config in stream_config:
+            if config.get("muted", False):
+                continue
+                
+            idx = int(config.get("id", 0))
+            if idx not in streams:
+                continue
+                
+            config["type"] = streams[idx]["type"]
+            
+            raw_val = streams[idx]["val"]
+            stype = config.get("type", "STRING")
+            
+            if stype == "STRING":
+                delim = config.get("delim", "\\n")
+                if delim == "\\n":
+                    delim = "\n"
+                
+                prefix = config.get("prefix", "")
+                suffix = config.get("suffix", "")
+                
+                input_string = ""
+                if raw_val is not None:
+                    if isinstance(raw_val, str):
+                        input_string = raw_val
+                    elif isinstance(raw_val, GeminiStream):
+                        input_string = "\n".join([p.text for p in raw_val.payloads if p.text])
+                    elif isinstance(raw_val, list) and len(raw_val) > 0 and isinstance(raw_val[0], str):
+                        input_string = "\n".join(raw_val)
+                        
+                if delim == "":
+                    parts = [f"{prefix}{input_string}{suffix}"] if input_string else []
+                else:
+                    parts = [f"{prefix}{p}{suffix}" for p in input_string.split(delim) if p]
+                    
+                processed_text_streams.append(parts)
+
+        max_text_len = max([len(p) for p in processed_text_streams if p] + [0])
+        max_img_len = 0
+        import math
+        for config in stream_config:
+            if config.get("muted", False):
+                continue
+            idx = int(config.get("id", 0))
+            if idx not in streams:
+                continue
+            if config.get("type", "STRING") == "IMAGE":
+                raw_val = streams[idx]["val"]
+                N = get_image_batch_length(raw_val)
+                imgs_per_job = int(config.get("imgs_per_job", 1))
+                cycle = config.get("cycle", "iterate")
+                if cycle == "iterate" and imgs_per_job > 0:
+                    max_img_len = max(max_img_len, math.ceil(N / imgs_per_job))
+                else:
+                    max_img_len = max(max_img_len, 1)
+                    
+        max_len = max(max_text_len, max_img_len)
+        
+        target_len = jobs if jobs > 0 else max_len
+        if target_len == 0:
+            target_len = 1
+        
+        for config in stream_config:
+            if config.get("muted", False):
+                continue
+                
+            idx = int(config.get("id", 0))
+            if idx not in streams:
+                continue
+                
+            raw_val = streams[idx]["val"]
+            stype = config.get("type", "STRING")
+            
+            if stype == "IMAGE":
+                print(f"DEBUG: Processing IMAGE stream for idx {idx}, raw_val type={type(raw_val)}")
+                job_imgs = self._process_image_stream(raw_val, config, target_len)
+                print(f"DEBUG: Processed image stream for idx {idx}, got {len(job_imgs)} job_imgs")
+                processed_image_streams[idx] = job_imgs
+
+        merged_stream = GeminiStream()
+        for i in range(target_len):
+            combined_string = ""
+            for parts in processed_text_streams:
+                if not parts:
+                    continue
+                part = parts[i % len(parts)]
+                combined_string += part
+            
+            job_img_list = []
+            job_vid_list = []
+            for idx, img_stream in processed_image_streams.items():
+                if i < len(img_stream) and img_stream[i] is not None:
+                    val = img_stream[i]
+                    c = next((x for x in stream_config if int(x.get("id", -1)) == int(idx)), {})
+                    is_vid_stream = (c.get("mode") == "video")
+                    v_path = get_video_file_path(val)
+                    
+                    if v_path:
+                        job_vid_list.append(v_path)
+                    elif is_vid_stream and isinstance(val, torch.Tensor) and len(val.shape) >= 4 and val.shape[0] > 1:
+                        import tempfile
+                        import cv2
+                        import numpy as np
+                        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
+                            tmp_path = tmp_file.name
+                        fps = float(c.get("fps", 24.0))
+                        frames = (val.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                        h, w = frames.shape[1], frames.shape[2]
+                        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                        out = cv2.VideoWriter(tmp_path, fourcc, fps, (w, h))
+                        for f_idx in range(frames.shape[0]):
+                            out.write(cv2.cvtColor(frames[f_idx], cv2.COLOR_RGB2BGR))
+                        out.release()
+                        job_vid_list.append(tmp_path)
+                    elif isinstance(val, torch.Tensor):
+                        job_img_list.append(val)
+            
+            print(f"DEBUG: Merged payload for job {i} has {len(job_img_list)} images, {len(job_vid_list)} videos, and text: {combined_string!r}")
+            merged_p = GeminiPayload(text=combined_string, images=job_img_list, videos=job_vid_list)
+            merged_stream.payloads.append(merged_p)
+            
+        import folder_paths
+        import os
+        from PIL import Image
+        import numpy as np
+        import random
+        import shutil
+        
+        results = []
+        max_idx = max(processed_image_streams.keys()) if processed_image_streams else 0
+        ui_streams = [None] * (max_idx + 1)
+        output_dir = folder_paths.get_temp_directory()
+        filename_prefix = "gemini_batch_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for x in range(5))
+        
+        counter = 1
+        for idx, img_stream in processed_image_streams.items():
+            ui_streams[idx] = []
+            
+            c = next((x for x in stream_config if int(x.get("id", -1)) == int(idx)), {})
+            mode = c.get("mode", "images")
+            fps = int(c.get("fps", 24))
+            
+            for i in range(target_len):
+                job_imgs_info = []
+                if i < len(img_stream) and img_stream[i] is not None:
+                    val = img_stream[i]
+                    v_path = get_video_file_path(val)
+                    if v_path:
+                        file_prefix = f"{filename_prefix}_{idx}_{i}"
+                        ext = os.path.splitext(v_path)[1] or ".mp4"
+                        file_name = f"{file_prefix}_{counter:05d}_{ext}"
+                        full_output_folder, filename, _, subfolder, _ = folder_paths.get_save_image_path(file_prefix, output_dir, 512, 512)
+                        full_path = os.path.join(full_output_folder, file_name)
+                        try:
+                            shutil.copyfile(v_path, full_path)
+                            img_dict = {
+                                "filename": file_name,
+                                "subfolder": subfolder,
+                                "type": "temp",
+                                "is_video": True
+                            }
+                            results.append(img_dict)
+                            job_imgs_info.append(img_dict)
+                            counter += 1
+                        except Exception as e:
+                            print(f"Failed to copy video for preview: {e}")
+                    elif mode == "video" and isinstance(val, torch.Tensor) and val.shape[0] > 1:
+                        import cv2
+                        file_prefix = f"{filename_prefix}_{idx}_{i}"
+                        file_name = f"{file_prefix}_{counter:05d}_.mp4"
+                        full_output_folder, filename, _, subfolder, _ = folder_paths.get_save_image_path(file_prefix, output_dir, val.shape[2], val.shape[1])
+                        
+                        full_path = os.path.join(full_output_folder, file_name)
+                        frames_np = (val.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                        
+                        h, w, _ = frames_np.shape[1], frames_np.shape[2], frames_np.shape[3]
+                        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                        writer = cv2.VideoWriter(full_path, fourcc, float(fps), (w, h))
+                        for f in frames_np:
+                            writer.write(cv2.cvtColor(f, cv2.COLOR_RGB2BGR))
+                        writer.release()
+                        
+                        img_dict = {
+                            "filename": file_name,
+                            "subfolder": subfolder,
+                            "type": "temp",
+                            "is_video": True
+                        }
+                        results.append(img_dict)
+                        job_imgs_info.append(img_dict)
+                        counter += 1
+                    elif isinstance(val, torch.Tensor):
+                        batch_tensor = val
+                        for b in range(batch_tensor.shape[0]):
+                            image = batch_tensor[b]
+                            i_val = 255. * image.cpu().numpy()
+                            img = Image.fromarray(np.clip(i_val, 0, 255).astype(np.uint8))
+                            
+                            full_output_folder, filename, _, subfolder, _ = folder_paths.get_save_image_path(filename_prefix, output_dir, img.size[0], img.size[1])
+                            
+                            file = f"{filename}_{counter:05d}_.png"
+                            img.save(os.path.join(full_output_folder, file), compress_level=1)
+                            img_dict = {
+                                "filename": file,
+                                "subfolder": subfolder,
+                                "type": "temp"
+                            }
+                            results.append(img_dict)
+                            job_imgs_info.append(img_dict)
+                            counter += 1
+                ui_streams[idx].append(job_imgs_info)
+
+        if results:
+            return { "ui": { "b_images": results, "streams": ui_streams }, "result": (merged_stream,) }
+
+        return (merged_stream,)
+
+class MediaPipePoseExtractor:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE,),
+            },
+            "optional": {
+                "render_mode": (["brush_motion_trails", "fluid_ribbons", "skeleton_only"], {"default": "brush_motion_trails"}),
+                "trail_length": ("INT", {"default": 14, "min": 0, "max": 60, "step": 1}),
+                "background": (["black", "white", "original"], {"default": "black"}),
+                "model_complexity": (["full", "heavy", "lite"], {"default": "full"}),
+                "min_detection_confidence": ("FLOAT", {"default": 0.5, "min": 0.1, "max": 1.0, "step": 0.05}),
+                "min_tracking_confidence": ("FLOAT", {"default": 0.5, "min": 0.1, "max": 1.0, "step": 0.05}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("skeleton_frames", "skeleton_video_file")
+    FUNCTION = "extract_pose"
+    CATEGORY = "gemini"
+
+    def extract_pose(self, video_or_images, render_mode="brush_motion_trails", trail_length=14, background="black", model_complexity="full", min_detection_confidence=0.5, min_tracking_confidence=0.5, fps=24):
+        import os
+        import urllib.request
+        import numpy as np
+        import cv2
+        import torch
+        import tempfile
+        import mediapipe as mp
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+        from mediapipe.tasks.python.vision import drawing_utils, drawing_styles, PoseLandmarksConnections
+
+        # Download or locate model
+        model_dir = os.path.join(folder_paths.base_path, "models", "mediapipe")
+        os.makedirs(model_dir, exist_ok=True)
+        model_path = os.path.join(model_dir, f"pose_landmarker_{model_complexity}.task")
+        
+        if not os.path.exists(model_path):
+            urls = {
+                "lite": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
+                "full": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task",
+                "heavy": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task"
+            }
+            url = urls.get(model_complexity, urls["full"])
+            print(f"[MediaPipe] Downloading {model_complexity} pose model from {url}...")
+            urllib.request.urlretrieve(url, model_path)
+
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            min_pose_detection_confidence=min_detection_confidence,
+            min_pose_presence_confidence=min_detection_confidence,
+            min_tracking_confidence=min_tracking_confidence,
+            output_segmentation_masks=False
+        )
+        detector = vision.PoseLandmarker.create_from_options(options)
+
+        frames_rgb = []
+        v_path = get_video_file_path(video_or_images)
+        
+        if v_path and os.path.exists(v_path):
+            cap = cv2.VideoCapture(v_path)
+            vid_fps = cap.get(cv2.CAP_PROP_FPS)
+            if vid_fps and vid_fps > 0:
+                fps = int(round(vid_fps))
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frames_rgb.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+        elif isinstance(video_or_images, torch.Tensor):
+            t = video_or_images
+            if len(t.shape) == 3:
+                t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            for i in range(np_frames.shape[0]):
+                frames_rgb.append(np_frames[i])
+        elif isinstance(video_or_images, list):
+            for item in video_or_images:
+                if isinstance(item, torch.Tensor):
+                    t = item
+                    if len(t.shape) == 3:
+                        t = t.unsqueeze(0)
+                    np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    for i in range(np_frames.shape[0]):
+                        frames_rgb.append(np_frames[i])
+
+        if not frames_rgb:
+            raise ValueError("[MediaPipePoseExtractor] No frames could be decoded from input video/images.")
+
+        # Keypoint trail palettes for brush trajectories
+        TRAIL_COLORS = {
+            15: (255, 95, 160),  # Left wrist: Vivid Rose
+            16: (0, 230, 255),   # Right wrist: Cyan
+            13: (255, 175, 20),  # Left elbow: Amber Gold
+            14: (60, 230, 90),   # Right elbow: Jade Green
+            27: (160, 60, 255),  # Left ankle: Violet
+            28: (255, 230, 0),   # Right ankle: Lemon
+            0:  (240, 245, 255)  # Head: Ice White
+        }
+
+        LIMB_PAIRS = [
+            (11, 13), (13, 15), # Left arm
+            (12, 14), (14, 16), # Right arm
+            (11, 12),           # Shoulders
+            (11, 23), (12, 24), # Torso
+            (23, 24),           # Hips
+            (23, 25), (25, 27), # Left leg
+            (24, 26), (26, 28)  # Right leg
+        ]
+
+        skeleton_frames = []
+        history = []
+        
+        for rgb_frame in frames_rgb:
+            h, w, _ = rgb_frame.shape
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            detection_result = detector.detect(mp_image)
+            
+            current_pts = {}
+            if detection_result.pose_landmarks and len(detection_result.pose_landmarks) > 0:
+                lm = detection_result.pose_landmarks[0]
+                for i in range(len(lm)):
+                    current_pts[i] = (int(lm[i].x * w), int(lm[i].y * h))
+            
+            history.append(current_pts)
+            if len(history) > max(1, trail_length):
+                history.pop(0)
+
+            if background == "white":
+                canvas = np.ones_like(rgb_frame) * 255
+            elif background == "original":
+                canvas = rgb_frame.copy()
+            else: # black
+                canvas = np.zeros_like(rgb_frame)
+                
+            if render_mode == "skeleton_only":
+                if detection_result.pose_landmarks:
+                    for pose_landmarks in detection_result.pose_landmarks:
+                        drawing_utils.draw_landmarks(
+                            canvas,
+                            pose_landmarks,
+                            PoseLandmarksConnections.POSE_LANDMARKS,
+                            drawing_styles.get_default_pose_landmarks_style()
+                        )
+            elif render_mode == "brush_motion_trails":
+                # 1. Motion trails for sweeping joints
+                for pt_idx, color in TRAIL_COLORS.items():
+                    pts_seq = [h_pts[pt_idx] for h_pts in history if pt_idx in h_pts]
+                    if len(pts_seq) > 1:
+                        for t_i in range(len(pts_seq) - 1):
+                            alpha = (t_i + 1) / len(pts_seq)
+                            thickness = int(max(2, alpha * 20))
+                            c_faded = (int(color[0] * alpha), int(color[1] * alpha), int(color[2] * alpha))
+                            cv2.line(canvas, pts_seq[t_i], pts_seq[t_i + 1], c_faded, thickness, cv2.LINE_AA)
+                            cv2.circle(canvas, pts_seq[t_i + 1], int(thickness // 2), c_faded, -1, cv2.LINE_AA)
+
+                # 2. Dynamic painterly ribbon limbs
+                if current_pts:
+                    for (p1, p2) in LIMB_PAIRS:
+                        if p1 in current_pts and p2 in current_pts:
+                            pt1, pt2 = current_pts[p1], current_pts[p2]
+                            cv2.line(canvas, pt1, pt2, (180, 210, 255), 14, cv2.LINE_AA)
+                            cv2.line(canvas, pt1, pt2, (255, 255, 255), 6, cv2.LINE_AA)
+            elif render_mode == "fluid_ribbons":
+                # Flowing ribbons tracing entire body structure across time
+                for (p1, p2) in LIMB_PAIRS:
+                    for t_i in range(len(history) - 1):
+                        h1 = history[t_i]
+                        h2 = history[t_i + 1]
+                        if p1 in h1 and p1 in h2:
+                            alpha = (t_i + 1) / len(history)
+                            c = (int(100 * alpha), int(200 * alpha), int(255 * alpha))
+                            cv2.line(canvas, h1[p1], h2[p1], c, int(max(1, alpha * 8)), cv2.LINE_AA)
+                if current_pts:
+                    for (p1, p2) in LIMB_PAIRS:
+                        if p1 in current_pts and p2 in current_pts:
+                            cv2.line(canvas, current_pts[p1], current_pts[p2], (255, 255, 255), 4, cv2.LINE_AA)
+
+            skeleton_frames.append(canvas)
+
+        h, w, _ = skeleton_frames[0].shape
+        if w % 2 != 0: w -= 1
+        if h % 2 != 0: h -= 1
+        
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_f:
+            tmp_mp4_path = tmp_f.name
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_writer = cv2.VideoWriter(tmp_mp4_path, fourcc, float(fps), (w, h))
+        for sf in skeleton_frames:
+            if sf.shape[1] != w or sf.shape[0] != h:
+                sf = cv2.resize(sf, (w, h))
+            out_writer.write(cv2.cvtColor(sf, cv2.COLOR_RGB2BGR))
+        out_writer.release()
+
+        out_tensor = torch.from_numpy(np.stack(skeleton_frames, axis=0).astype(np.float32) / 255.0)
+        
+        print(f"[MediaPipePoseExtractor] Extracted {len(skeleton_frames)} skeleton frames @ {fps}fps to {tmp_mp4_path}")
+        return (out_tensor, tmp_mp4_path)
+
+class KineticMotionCurveExtractor:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE,),
+            },
+            "optional": {
+                "spline_type": (["catmull_rom_spline", "bezier_spline", "linear"], {"default": "catmull_rom_spline"}),
+                "trail_window": ("INT", {"default": 20, "min": 2, "max": 60, "step": 1}),
+                "stroke_base_thickness": ("INT", {"default": 18, "min": 2, "max": 50, "step": 1}),
+                "speed_to_width_factor": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 5.0, "step": 0.1}),
+                "speed_to_brightness_factor": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1}),
+                "dense_optical_flow": (["enable", "disable"], {"default": "enable"}),
+                "temporal_smoothing": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "model_complexity": (["full", "heavy", "lite"], {"default": "full"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
             }
         }
 
@@ -107,8 +1712,7 @@ class KineticMotionCurveExtractor:
         "kinetic_motion_data"
     )
     FUNCTION = "extract_motion_representation"
-    CATEGORY = "KineticMotion"
-    DESCRIPTION = "Extracts 3D pose kinematics, segmentation, optical flow, and velocity-modulated spline curves."
+    CATEGORY = "gemini"
 
     def _catmull_rom(self, pts, num_samples=8):
         if len(pts) < 2: return pts
@@ -116,10 +1720,7 @@ class KineticMotionCurveExtractor:
         pts = [pts[0]] + list(pts) + [pts[-1]]
         curve = []
         for i in range(len(pts) - 3):
-            p0 = np.array(pts[i], dtype=float)
-            p1 = np.array(pts[i+1], dtype=float)
-            p2 = np.array(pts[i+2], dtype=float)
-            p3 = np.array(pts[i+3], dtype=float)
+            p0, p1, p2, p3 = np.array(pts[i], dtype=float), np.array(pts[i+1], dtype=float), np.array(pts[i+2], dtype=float), np.array(pts[i+3], dtype=float)
             for t in np.linspace(0, 1, num_samples, endpoint=False):
                 t2 = t * t
                 t3 = t2 * t
@@ -140,19 +1741,13 @@ class KineticMotionCurveExtractor:
             tw = cv2.getTextSize(subtext, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)[0][0]
             cv2.putText(img, subtext, (max(10, w - tw - 10), 23), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 200, 230), 1, cv2.LINE_AA)
 
-    def extract_motion_representation(
-        self,
-        video_or_images,
-        spline_type="catmull_rom_spline",
-        trail_window=20,
-        stroke_base_thickness=18,
-        speed_to_width_factor=1.8,
-        speed_to_brightness_factor=1.2,
-        dense_optical_flow="enable",
-        temporal_smoothing=0.6,
-        model_complexity="full",
-        fps=24
-    ):
+    def extract_motion_representation(self, video_or_images, spline_type="catmull_rom_spline", trail_window=20, stroke_base_thickness=18, speed_to_width_factor=1.8, speed_to_brightness_factor=1.2, dense_optical_flow="enable", temporal_smoothing=0.6, model_complexity="full", fps=24):
+        import os
+        import urllib.request
+        import numpy as np
+        import cv2
+        import torch
+        import tempfile
         import mediapipe as mp
         from mediapipe.tasks import python
         from mediapipe.tasks.python import vision
@@ -454,10 +2049,6 @@ class KineticMotionCurveExtractor:
 
 
 class KineticMotionToBrushRenderer:
-    """
-    Transforms kinetic trajectory data and optical flow vectors into progressive,
-    expressive abstract brushstrokes on canvas with physical paint temporal decay and bloom glow.
-    """
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -480,15 +2071,15 @@ class KineticMotionToBrushRenderer:
                 "anchor_weight_feet": ("FLOAT", {"default": 1.5, "min": 0.1, "max": 5.0, "step": 0.1, "tooltip": "Weight for ankle/feet floor movements"}),
                 "anchor_weight_elbows_knees": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Weight for elbow and knee articulation"}),
                 "anchor_weight_torso_head": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Weight for torso center of mass and head"}),
-                "brush_color_mode": (["luminous_white", "kinetic_spectrum", "warm_amber", "cool_cyan"], {"default": "luminous_white", "tooltip": "Color palette preset"}),
-                "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Output video frame rate"}),
+                "brush_color_mode": (["luminous_white", "kinetic_spectrum", "warm_amber", "cool_cyan"], {"default": "luminous_white"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
             }
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("brush_stroke_frames", "brush_stroke_video_file")
     FUNCTION = "render_brush_strokes"
-    CATEGORY = "KineticMotion"
+    CATEGORY = "gemini"
     DESCRIPTION = "Converts motion trajectories and splines into abstract, progressive dynamic brushstrokes on canvas."
 
     def _catmull_rom(self, pts, num_samples=8):
@@ -509,27 +2100,13 @@ class KineticMotionToBrushRenderer:
         curve.append(pts[-2])
         return curve
 
-    def render_brush_strokes(
-        self,
-        motion_input,
-        trajectory_history_length=24,
-        temporal_decay=0.88,
-        stroke_base_width=22,
-        min_stroke_width=3,
-        max_stroke_width=48,
-        velocity_influence=1.8,
-        acceleration_influence=0.8,
-        brush_head_size=14,
-        optical_flow_strength=0.4,
-        particle_density=0.5,
-        glow_strength=0.6,
-        anchor_weight_wrists=2.2,
-        anchor_weight_feet=1.5,
-        anchor_weight_elbows_knees=1.0,
-        anchor_weight_torso_head=0.8,
-        brush_color_mode="luminous_white",
-        fps=24
-    ):
+    def render_brush_strokes(self, motion_input, trajectory_history_length=24, temporal_decay=0.88, stroke_base_width=22, min_stroke_width=3, max_stroke_width=48, velocity_influence=1.8, acceleration_influence=0.8, brush_head_size=14, optical_flow_strength=0.4, particle_density=0.5, glow_strength=0.6, anchor_weight_wrists=2.2, anchor_weight_feet=1.5, anchor_weight_elbows_knees=1.0, anchor_weight_torso_head=0.8, brush_color_mode="luminous_white", fps=24):
+        import os
+        import numpy as np
+        import cv2
+        import torch
+        import tempfile
+
         # Unpack motion_input
         motion_data = None
         if isinstance(motion_input, dict) and "history_pts" in motion_input:
@@ -554,10 +2131,10 @@ class KineticMotionToBrushRenderer:
 
         # Motion Anchor Hierarchical Weighting
         ANCHOR_WEIGHTS = {
-            15: anchor_weight_wrists,       # Left wrist
-            16: anchor_weight_wrists,       # Right wrist
-            27: anchor_weight_feet,         # Left ankle
-            28: anchor_weight_feet,         # Right ankle
+            15: anchor_weight_wrists,  # Left wrist
+            16: anchor_weight_wrists,  # Right wrist
+            27: anchor_weight_feet,    # Left ankle
+            28: anchor_weight_feet,    # Right ankle
             13: anchor_weight_elbows_knees, # Left elbow
             14: anchor_weight_elbows_knees, # Right elbow
             25: anchor_weight_elbows_knees, # Left knee
@@ -692,135 +2269,28 @@ class KineticMotionToBrushRenderer:
         print(f"[KineticMotionToBrushRenderer] Rendered {len(rendered_frames)} abstract brushstroke frames @ {fps}fps to {tmp_mp4_path}")
         return (out_tensor, tmp_mp4_path)
 
-
-class KineticVideoCombine:
-    """
-    Combines image frame batches into MP4/WebP/GIF video with inline animated UI preview.
-    """
-    def __init__(self):
-        self.output_dir = folder_paths.get_output_directory()
-        self.temp_dir = folder_paths.get_temp_directory()
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "images": ("IMAGE", {"tooltip": "Batch of image frames [B, H, W, C]"}),
-                "frame_rate": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1, "tooltip": "Playback frame rate (FPS)"}),
-                "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
-                "save_output": ("BOOLEAN", {"default": True, "tooltip": "Save output to ComfyUI output directory"}),
-                "filename_prefix": ("STRING", {"default": "KineticVideo", "tooltip": "Prefix for saved video/animation files"}),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("images", "video_path")
-    OUTPUT_NODE = True
-    FUNCTION = "combine_video"
-    CATEGORY = "KineticMotion"
-    DESCRIPTION = "Combines image frames into a playable video/animation with inline preview."
-
-    def combine_video(self, images, frame_rate=24, format="mp4", save_output=True, filename_prefix="KineticVideo"):
-        if images is None or len(images.shape) < 4 or images.shape[0] == 0:
-            return {"ui": {"images": []}, "result": (images, "")}
-
-        output_dir = self.output_dir if save_output else self.temp_dir
-        type_str = "output" if save_output else "temp"
-
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
-            filename_prefix, output_dir, images[0].shape[1], images[0].shape[0]
-        )
-
-        h, w = images.shape[1], images.shape[2]
-        num_frames = images.shape[0]
-
-        pil_frames = []
-        for idx in range(num_frames):
-            frame_np = (images[idx].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
-            pil_frames.append(Image.fromarray(frame_np))
-
-        duration_ms = max(1, int(1000.0 / max(1, frame_rate)))
-        saved_file_path = ""
-        ui_results = []
-
-        if format == "animated_webp":
-            file_name = f"{filename}_{counter:05d}_.webp"
-            saved_file_path = os.path.join(full_output_folder, file_name)
-            pil_frames[0].save(
-                saved_file_path,
-                save_all=True,
-                append_images=pil_frames[1:],
-                duration=duration_ms,
-                loop=0,
-                quality=92,
-                method=4
-            )
-            ui_results.append({
-                "filename": file_name,
-                "subfolder": subfolder,
-                "type": type_str,
-                "format": "image/webp"
-            })
-        elif format == "gif":
-            file_name = f"{filename}_{counter:05d}_.gif"
-            saved_file_path = os.path.join(full_output_folder, file_name)
-            pil_frames[0].save(
-                saved_file_path,
-                save_all=True,
-                append_images=pil_frames[1:],
-                duration=duration_ms,
-                loop=0
-            )
-            ui_results.append({
-                "filename": file_name,
-                "subfolder": subfolder,
-                "type": type_str,
-                "format": "image/gif"
-            })
-        else:  # mp4
-            file_name = f"{filename}_{counter:05d}_.mp4"
-            saved_file_path = os.path.join(full_output_folder, file_name)
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(saved_file_path, fourcc, float(frame_rate), (w, h))
-            for idx in range(num_frames):
-                frame_bgr = cv2.cvtColor((images[idx].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
-                out.write(frame_bgr)
-            out.release()
-
-            preview_webp_name = f"{filename}_{counter:05d}_preview.webp"
-            preview_path = os.path.join(full_output_folder, preview_webp_name)
-            pil_frames[0].save(
-                preview_path,
-                save_all=True,
-                append_images=pil_frames[1:],
-                duration=duration_ms,
-                loop=0,
-                quality=85,
-                method=3
-            )
-            ui_results.append({
-                "filename": preview_webp_name,
-                "subfolder": subfolder,
-                "type": type_str,
-                "format": "image/webp"
-            })
-
-        return {
-            "ui": {"images": ui_results},
-            "result": (images, saved_file_path)
-        }
-
-
 NODE_CLASS_MAPPINGS = {
+    "GeminiProModel": GeminiProModel,
+    "GeminiOmniModel": GeminiOmniModel,
+    "GeminiAuthConfig": GeminiAuthConfig,
+    "GeminiMultimodalPreview": GeminiMultimodalPreview,
+    "GeminiJobBatcher": GeminiJobBatcher,
+    "GeminiVideoCombine": GeminiVideoCombine,
+    "KineticVideoCombine": GeminiVideoCombine,
+    "MediaPipePoseExtractor": MediaPipePoseExtractor,
     "KineticMotionCurveExtractor": KineticMotionCurveExtractor,
-    "KineticMotionToBrushRenderer": KineticMotionToBrushRenderer,
-    "KineticVideoCombine": KineticVideoCombine,
-    "GeminiVideoCombine": KineticVideoCombine  # Backward compatibility alias
+    "KineticMotionToBrushRenderer": KineticMotionToBrushRenderer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "KineticMotionCurveExtractor": "Google Kinetic Motion Curve Extractor",
-    "KineticMotionToBrushRenderer": "Kinetic Motion-to-Brush Renderer",
+    "GeminiProModel": "Gemini Execution Node",
+    "GeminiOmniModel": "Gemini Omni Model",
+    "GeminiAuthConfig": "Gemini Auth Config",
+    "GeminiMultimodalPreview": "Gemini Multimodal Preview",
+    "GeminiJobBatcher": "Gemini Job Batcher",
+    "GeminiVideoCombine": "Gemini Video Combine & Preview",
     "KineticVideoCombine": "Kinetic Video Combine & Preview",
-    "GeminiVideoCombine": "Gemini Video Combine & Preview"
+    "MediaPipePoseExtractor": "Google MediaPipe Pose Extractor",
+    "KineticMotionCurveExtractor": "Google Kinetic Motion Curve Extractor",
+    "KineticMotionToBrushRenderer": "Kinetic Motion-to-Brush Renderer"
 }

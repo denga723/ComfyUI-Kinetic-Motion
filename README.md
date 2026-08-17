@@ -35,9 +35,24 @@ Designed specifically for AI animation, video-to-video generative stylization, a
 
 ---
 
-### 3. **Kinetic Video Combine & Preview** (`KineticVideoCombine`)
+### 3. **Kinetic Video Combine & Preview** (`KineticVideoCombine` / `GeminiVideoCombine`)
 * Combines frame batches into `.mp4`, animated `.webp`, or `.gif`.
 * Renders instant inline animated previews directly in the ComfyUI node interface without requiring third-party video preview suites.
+
+---
+
+### 4. **Gemini Enterprise & Multimodal Suite**
+* **`GeminiOmniModel` & `GeminiProModel`**: Connects ComfyUI directly to Google Gemini Multimodal / Omni models for video and image stylization, analysis, and prompting.
+* **`GeminiAuthConfig`**: Centralized, secure authentication handling for Google Cloud / Gemini API keys and Service Accounts.
+* **`GeminiJobBatcher`**: High-throughput asynchronous batching engine with concurrent queue management.
+* **`GeminiMultimodalPreview`**: Live multimodal request and response inspector.
+
+---
+
+### 5. **Image Processing, Batching & Utilities**
+* **`JR_LoadImageBatch`**: Directory-based bulk image sequence and video frame loader with sorting, step filtering, and repeat modes.
+* **`CropAndResize`, `ImageTileSplitter`, `ImageBatchSeamProvider`, `ImageTileComposite`**: Ultra-high-resolution tiling, seam-blending, and composite transformations.
+* **`VisualFileBrowserNode`, `OutputFolderBroadcasterNode`, `WirelessGetterNode`**: Interactive file browser and wireless node routing for cleaner workflows.
 
 ---
 
