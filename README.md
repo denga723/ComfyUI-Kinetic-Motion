@@ -103,16 +103,10 @@ The package includes pre-configured workflow JSON files in the `workflow_example
      - Clean Motion Extractor Output
      - Kinetic Dynamic Brushstrokes Video
 
-2. **`tapnet_fusion.json`**:
-   * **DeepMind TAPNet + Kinetic Motion Fusion Pipeline**.
-   * Tracks 128+ persistent surface points on the dancer's clothing, hair, and limbs with occlusion confidence.
-   * Multi-layer rendering: MediaPipe Macro Skeletal Ribbons + TAPNet Micro Surface Filaments + Swirling Embers + Optical Flow Streamlines.
-   * End-to-end stylized video generation with Google Gemini Omni and 4 Style Reference Images.
-
-3. **`Kinetic_with_JR_customnodes.json`**:
+2. **`Kinetic_with_JR_customnodes.json`**:
    * Complete end-to-end video-to-video stylization pipeline connecting Kinetic Brushstrokes to Google Gemini Omni and 4 Style Reference Images.
 
-4. **`parameter_comparison.json`**:
+3. **`parameter_comparison.json`**:
    * Parameter matrix comparing different decay rates, stroke thicknesses, velocity factors, and color modes.
 
 ---
