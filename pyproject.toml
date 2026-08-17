@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui-kinetic-motion"
+version = "1.0.0"
+description = "Google Kinetic Motion Curve Extractor and Dynamic Brushstroke Renderer for ComfyUI"
+readme = "README.md"
+authors = [
+  { name = "Andrew Deng", email = "denga723@newschool.edu" }
+]
+license = { text = "Apache-2.0" }
+dependencies = [
+  "torch>=2.0.0",
+  "mediapipe>=0.10.0",
+  "opencv-python>=4.7.0",
+  "numpy>=1.22.0",
+  "Pillow>=9.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/denga723/ComfyUI-Kinetic-Motion"
+Repository = "https://github.com/denga723/ComfyUI-Kinetic-Motion"
+
+[tool.comfy]
+PublisherId = "andrewdeng"
+DisplayName = "ComfyUI-Kinetic-Motion"
+Icon = ""
