@@ -2706,9 +2706,9 @@ class KineticTAPNetBrushFusionRenderer:
                             curr_head = fil_pts[-1]
                             cv2.circle(stroke_layer, curr_head, max(1, int(filament_width * 1.2)), f_rgb, -1, cv2.LINE_AA)
 
-                            if tap_particle_density > 0.1 and tap_velocities is not None:
+                            if tapnet_particle_density > 0.1 and tap_velocities is not None:
                                 p_spd = tap_velocities[i, t]
-                                if p_spd > 4.0 and np.random.rand() < tap_particle_density:
+                                if p_spd > 4.0 and np.random.rand() < tapnet_particle_density:
                                     ember_offset = np.random.uniform(-8, 8, size=2).astype(int)
                                     ember_pt = (curr_head[0] + ember_offset[0], curr_head[1] + ember_offset[1])
                                     if 0 <= ember_pt[0] < w and 0 <= ember_pt[1] < h:
