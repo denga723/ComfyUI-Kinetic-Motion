@@ -2596,6 +2596,7 @@ class KineticTAPNetBrushFusionRenderer:
                     "white_kinetic_blue_tapnet",
                     "white_kinetic_amber_tapnet",
                     "white_kinetic_white_tapnet",
+                    "colorful_kinetic_white_tapnet",
                     "green_kinetic_colorful_tapnet",
                     "gold_kinetic_cyan_tapnet",
                     "pink_kinetic_cyan_tapnet",
@@ -2706,6 +2707,15 @@ class KineticTAPNetBrushFusionRenderer:
                 "As the dancer moves, the white calligraphy ribbons and delicate white surface filaments self-paint across the scene against the pure dark void "
                 "with dramatic studio lighting, ultra-detailed fine art."
             ),
+            "colorful_kinetic_white_tapnet": (
+                "Masterpiece self-moving animated oil painting on deep black canvas. "
+                "Interpret the dynamic kinetic ribbons as sweeping multi-colored strokes of thick rainbow impasto oil paint "
+                "(emerald, cobalt, crimson, amber, violet) with visible palette-knife textures and heavy physical relief. "
+                "Interpret every single tracking dot and filament as an autonomous droplet of glistening, thick titanium white oil paint "
+                "that blooms and swirls into fine wet white filaments with luminous glowing embers. "
+                "As the dancer moves, the colorful structural ribbons and delicate white surface filaments self-paint across the scene "
+                "against the pure dark void with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+            ),
             "green_kinetic_colorful_tapnet": (
                 "Masterpiece self-moving animated oil painting on deep black canvas. "
                 "Interpret the vibrant green kinetic ribbons as dynamic, sweeping strokes of rich emerald and jade impasto oil paint. "
@@ -2801,6 +2811,13 @@ class KineticTAPNetBrushFusionRenderer:
                 "default": (0.95, 0.98, 1.0)
             }
             filament_base = (0.95, 0.98, 1.0)
+        elif brush_color_mode == "colorful_kinetic_white_tapnet":
+            # Rainbow Skeletal Ribbons + Pure Luminous White Filaments
+            skeletal_palette = {
+                15: (1.0, 0.18, 0.45), 16: (0.05, 0.85, 0.95), 27: (0.7, 0.2, 1.0), 28: (1.0, 0.8, 0.1),
+                11: (0.2, 0.9, 0.4), 12: (1.0, 0.45, 0.1), "default": (0.9, 0.9, 0.95)
+            }
+            filament_base = (0.96, 0.98, 1.0)
         elif brush_color_mode == "white_kinetic_colorful_tapnet":
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
