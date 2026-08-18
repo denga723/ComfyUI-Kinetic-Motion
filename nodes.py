@@ -4447,7 +4447,8 @@ class SingleCharacterMaskKineticRenderer:
     """
     Pure Mask-Driven Single Character Kinetic & TAPNet Renderer.
     Zero reliance on 3D pose keypoints. Seeds all kinetic trajectory splines
-    and TAPNet surface points strictly from the character's segmentation mask.
+    and TAPNet surface points strictly from the character's segmentation mask
+    with strict jump-distance filtering and short temporal trail persistence.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -4459,12 +4460,12 @@ class SingleCharacterMaskKineticRenderer:
             "optional": {
                 "kinetic_stroke_color": (["red", "green", "gold", "yellow", "blue", "cyan", "white", "magenta"], {"default": "red"}),
                 "tapnet_point_color": (["yellow", "blue", "gold", "green", "red", "cyan", "white"], {"default": "yellow"}),
-                "num_tracking_points": ("INT", {"default": 128, "min": 16, "max": 512, "step": 16}),
-                "trail_window": ("INT", {"default": 20, "min": 2, "max": 60, "step": 1}),
-                "stroke_base_thickness": ("INT", {"default": 18, "min": 2, "max": 60, "step": 1}),
-                "point_radius": ("INT", {"default": 4, "min": 1, "max": 16, "step": 1}),
-                "paint_decay": ("FLOAT", {"default": 0.88, "min": 0.5, "max": 0.99, "step": 0.01}),
-                "impasto_strength": ("FLOAT", {"default": 1.5, "min": 0.5, "max": 3.0, "step": 0.1}),
+                "num_tracking_points": ("INT", {"default": 96, "min": 16, "max": 512, "step": 16}),
+                "trail_window": ("INT", {"default": 6, "min": 1, "max": 60, "step": 1, "tooltip": "Short trail length to keep lines crisp and dynamic"}),
+                "stroke_base_thickness": ("INT", {"default": 14, "min": 2, "max": 60, "step": 1}),
+                "point_radius": ("INT", {"default": 3, "min": 1, "max": 16, "step": 1}),
+                "paint_decay": ("FLOAT", {"default": 0.75, "min": 0.2, "max": 0.99, "step": 0.01, "tooltip": "Canvas decay rate - lower values make strokes disappear faster"}),
+                "impasto_strength": ("FLOAT", {"default": 1.2, "min": 0.5, "max": 3.0, "step": 0.1}),
                 "glow_bloom": (["enable", "disable"], {"default": "enable"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
                 "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
@@ -4520,12 +4521,12 @@ class SingleCharacterMaskKineticRenderer:
         character_mask,
         kinetic_stroke_color="red",
         tapnet_point_color="yellow",
-        num_tracking_points=128,
-        trail_window=20,
-        stroke_base_thickness=18,
-        point_radius=4,
-        paint_decay=0.88,
-        impasto_strength=1.5,
+        num_tracking_points=96,
+        trail_window=6,
+        stroke_base_thickness=14,
+        point_radius=3,
+        paint_decay=0.75,
+        impasto_strength=1.2,
         glow_bloom="enable",
         fps=24,
         max_resolution="720p (Fastest)"
@@ -4616,7 +4617,7 @@ class SingleCharacterMaskKineticRenderer:
             cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             frame_cents = []
             for c in cnts:
-                if cv2.contourArea(c) > 80:
+                if cv2.contourArea(c) > 120:
                     M = cv2.moments(c)
                     if M["m00"] > 0:
                         frame_cents.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
@@ -4638,38 +4639,59 @@ class SingleCharacterMaskKineticRenderer:
 
             start_t = max(0, fi - trail_window)
 
-            # Draw Kinetic Splines
-            seq = [centroids_history[t] for t in range(start_t, fi + 1) if centroids_history[t]]
-            if len(seq) >= 2:
-                flat = [p[0] for p in seq if len(p) > 0]
-                spline = self._catmull_rom(flat, num_samples=6)
-                for j in range(len(spline) - 1):
-                    alpha = (j + 1) / float(max(1, len(spline)))
-                    th = max(2, int(stroke_base_thickness * alpha * impasto_strength))
-                    col = tuple(int(c * alpha) for c in stroke_rgb)
-                    cv2.line(curr_splines, spline[j], spline[j+1], col, th, cv2.LINE_AA)
-                    cv2.line(curr_combined, spline[j], spline[j+1], col, th, cv2.LINE_AA)
+            # Spatial continuity tracking for centroids to prevent jumping lines
+            tracked_cents = []
+            last_p = None
+            for t in range(start_t, fi + 1):
+                fc = centroids_history[t]
+                if not fc: continue
+                if last_p is None:
+                    last_p = fc[0]
+                    tracked_cents.append(last_p)
+                else:
+                    best_p = min(fc, key=lambda p: np.hypot(p[0]-last_p[0], p[1]-last_p[1]))
+                    if np.hypot(best_p[0]-last_p[0], best_p[1]-last_p[1]) < 35.0:
+                        last_p = best_p
+                        tracked_cents.append(last_p)
+                    else:
+                        last_p = best_p
+                        tracked_cents = [last_p]
 
-            # Draw TAPNet Points & Filaments
+            # Draw Short Kinetic Splines with jump protection
+            if len(tracked_cents) >= 2:
+                for j in range(len(tracked_cents) - 1):
+                    p_dist = np.hypot(tracked_cents[j+1][0] - tracked_cents[j][0], tracked_cents[j+1][1] - tracked_cents[j][1])
+                    if p_dist < 35.0:
+                        alpha = ((j + 1) / float(len(tracked_cents))) ** 1.2
+                        th = max(2, int(stroke_base_thickness * alpha * impasto_strength))
+                        col = tuple(int(c * alpha) for c in stroke_rgb)
+                        cv2.line(curr_splines, tracked_cents[j], tracked_cents[j+1], col, th, cv2.LINE_AA)
+                        cv2.line(curr_combined, tracked_cents[j], tracked_cents[j+1], col, th, cv2.LINE_AA)
+
+            # Draw TAPNet Points & Short Filaments with strict jump protection
             for pt in tracks[fi]:
                 cv2.circle(curr_points, (int(round(pt[0])), int(round(pt[1]))), point_radius, point_rgb, -1)
                 cv2.circle(curr_combined, (int(round(pt[0])), int(round(pt[1]))), point_radius, point_rgb, -1)
 
             for t in range(start_t, fi):
                 for p_idx in range(min(len(tracks[t]), len(tracks[t+1]))):
-                    alpha = (t - start_t + 1) / float(trail_window)
-                    col = tuple(int(c * alpha) for c in point_rgb)
-                    pt_a = tuple(np.round(tracks[t][p_idx]).astype(int))
-                    pt_b = tuple(np.round(tracks[t+1][p_idx]).astype(int))
-                    cv2.line(curr_points, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
-                    cv2.line(curr_combined, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
+                    pt_a = tracks[t][p_idx]
+                    pt_b = tracks[t+1][p_idx]
+                    # JUMP PROTECTION: Never connect points that jumped > 25px (avoids stray cross-canvas lines)
+                    if np.hypot(pt_b[0]-pt_a[0], pt_b[1]-pt_a[1]) < 25.0:
+                        alpha = ((t - start_t + 1) / float(trail_window)) ** 1.5
+                        col = tuple(int(c * alpha) for c in point_rgb)
+                        p_a_i = (int(round(pt_a[0])), int(round(pt_a[1])))
+                        p_b_i = (int(round(pt_b[0])), int(round(pt_b[1])))
+                        cv2.line(curr_points, p_a_i, p_b_i, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
+                        cv2.line(curr_combined, p_a_i, p_b_i, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
 
             accum_canvas = np.clip(accum_canvas + curr_combined.astype(np.float32) / 255.0, 0.0, 1.0)
             
             final_f = accum_canvas.copy()
             if glow_bloom == "enable":
                 bloom = cv2.GaussianBlur(final_f, (15, 15), 0)
-                final_f = np.clip(final_f + bloom * 0.4, 0.0, 1.0)
+                final_f = np.clip(final_f + bloom * 0.35, 0.0, 1.0)
 
             out_layer.append(final_f)
             out_splines.append(curr_splines.astype(np.float32) / 255.0)
@@ -4695,8 +4717,7 @@ class DualCharacterPhysicalCompositor:
     """
     Dual-Character Physical Compositor.
     Composites Character 1's layer (Red + Yellow) and Character 2's layer (Green + Blue)
-    into a cohesive master duet artwork with independent weight sliders, blend modes,
-    and contact spark flare generation where the dancers interact.
+    by pure simple addition without changing colors when they cross or interact.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -4706,11 +4727,10 @@ class DualCharacterPhysicalCompositor:
                 "char2_layer": (ANY_TYPE, {"tooltip": "Character 2 Layer (Green Kinetic + Blue TAPNet)"}),
             },
             "optional": {
-                "blend_mode": (["physical_paint_mix", "additive_glow", "screen", "char1_over_char2", "char2_over_char1"], {"default": "physical_paint_mix"}),
+                "blend_mode": (["simple_additive", "screen", "char1_over_char2", "char2_over_char1"], {"default": "simple_additive"}),
                 "char1_weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
                 "char2_weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
-                "contact_sparks": (["enable", "disable"], {"default": "enable", "tooltip": "Spawn luminous golden particle flares at points of contact between dancers"}),
-                "bloom_intensity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 2.0, "step": 0.05}),
+                "bloom_intensity": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 2.0, "step": 0.05}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
             }
         }
@@ -4743,7 +4763,7 @@ class DualCharacterPhysicalCompositor:
             return res
         return []
 
-    def composite_characters(self, char1_layer, char2_layer, blend_mode="physical_paint_mix", char1_weight=1.0, char2_weight=1.0, contact_sparks="enable", bloom_intensity=0.5, fps=24):
+    def composite_characters(self, char1_layer, char2_layer, blend_mode="simple_additive", char1_weight=1.0, char2_weight=1.0, bloom_intensity=0.3, fps=24):
         c1_frames = self._extract_frames(char1_layer)
         c2_frames = self._extract_frames(char2_layer)
 
@@ -4762,9 +4782,7 @@ class DualCharacterPhysicalCompositor:
             if f2.shape[:2] != (h, w):
                 f2 = cv2.resize(f2, (w, h))
 
-            if blend_mode == "additive_glow":
-                fused = np.clip(f1 + f2, 0.0, 1.0)
-            elif blend_mode == "screen":
+            if blend_mode == "screen":
                 fused = 1.0 - (1.0 - f1) * (1.0 - f2)
             elif blend_mode == "char1_over_char2":
                 mask1 = (np.max(f1, axis=-1, keepdims=True) > 0.05).astype(np.float32)
@@ -4772,18 +4790,11 @@ class DualCharacterPhysicalCompositor:
             elif blend_mode == "char2_over_char1":
                 mask2 = (np.max(f2, axis=-1, keepdims=True) > 0.05).astype(np.float32)
                 fused = f2 * mask2 + f1 * (1.0 - mask2)
-            else: # physical_paint_mix
+            else: # simple_additive
                 fused = np.clip(f1 + f2, 0.0, 1.0)
 
-            # Contact Sparks: where both layers overlap
-            if contact_sparks == "enable":
-                overlap = (np.max(f1, axis=-1) > 0.1) & (np.max(f2, axis=-1) > 0.1)
-                if np.any(overlap):
-                    spark_color = np.array([1.0, 0.9, 0.3], dtype=np.float32)
-                    fused[overlap] = np.clip(fused[overlap] * 0.5 + spark_color * 0.7, 0.0, 1.0)
-
             if bloom_intensity > 0.01:
-                bloom = cv2.GaussianBlur(fused, (17, 17), 0)
+                bloom = cv2.GaussianBlur(fused, (15, 15), 0)
                 fused = np.clip(fused + bloom * bloom_intensity, 0.0, 1.0)
 
             out_fused.append(fused)
