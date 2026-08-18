@@ -90,9 +90,15 @@ Search for `ComfyUI-Kinetic-Motion` in ComfyUI Manager and click **Install**.
 
 ## 📂 Included Workflows
 
-The package includes pre-configured workflow JSON files in the `workflow_examples/` directory:
+1. **`tapnet_fusion.json`** *(Flagship Full Pipeline)*:
+   * End-to-end multi-layer kinetic fusion and generative video stylization workflow.
+   * **DeepMind TAPNet Lagrangian Point Tracking**: Tracks 128 surface points with occlusion-aware virtual pen lifting.
+   * **Kinetic + TAPNet Brush Fusion**: Merges macro skeletal motion ribbons with micro surface filaments and particle embers.
+   * **4 Style Reference Images Conditioning**: Batches 4 style reference images (`ImageBatchMulti`) for Gemini Omni reference roles.
+   * **Dynamic Prompt Generation**: Automatically generates rich impasto motion stylization prompts matching active color modes.
+   * **Complete 8-Stage Video Preview Suite**: Real-time previews for Stages 1–6, 2x2 HUD Diagnostic Grid, Omni Final Art, and synchronized Side-by-Side Dual Comparison Viewer.
 
-1. **`kinetic_example.json`**:
+2. **`kinetic_example.json`**:
    * Pure standalone workflow featuring the Extractor and Brush Renderer.
    * Full **7-output Preview Suite**:
      - Stage 1: Human Segmentation Mask
@@ -103,10 +109,10 @@ The package includes pre-configured workflow JSON files in the `workflow_example
      - Clean Motion Extractor Output
      - Kinetic Dynamic Brushstrokes Video
 
-2. **`Kinetic_with_JR_customnodes.json`**:
+3. **`Kinetic_with_JR_customnodes.json`**:
    * Complete end-to-end video-to-video stylization pipeline connecting Kinetic Brushstrokes to Google Gemini Omni and 4 Style Reference Images.
 
-3. **`parameter_comparison.json`**:
+4. **`parameter_comparison.json`**:
    * Parameter matrix comparing different decay rates, stroke thicknesses, velocity factors, and color modes.
 
 ---
