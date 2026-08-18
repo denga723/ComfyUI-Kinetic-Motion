@@ -90,7 +90,14 @@ Search for `ComfyUI-Kinetic-Motion` in ComfyUI Manager and click **Install**.
 
 ## 📂 Included Workflows
 
-1. **`tapnet_fusion.json`** *(Flagship Full Pipeline)*:
+1. **`tapnet_fusion_nano_banana.json`** *(Advanced Keyframe-Guided Pipeline)*:
+   * Extracts **4 representative screenshots** at key timepoints (T=10%, 35%, 60%, 85%) from Step 6 Fused Dynamic Brushstrokes video.
+   * Feeds each screenshot into a dedicated **Nano Banana (Google Gemini 2.5 Flash Image)** stylizer paired with an independent **Oil Painting Style Reference** image.
+   * Injects tactile impasto paint ridges, brush texture, pigment blending, and canvas grain into the keyframes while preserving kinetic motion structure exactly.
+   * Feeds the 4 Nano Banana stylized keyframe outputs into **Gemini Omni Model** as temporal style anchors (`Image1`..`Image4`) alongside Step 6 brushstrokes video.
+   * Full preview suite including all 6 intermediate video stages, 4 Nano Banana keyframe previews, Final Stylized Video, and Dual Synchronized Side-by-Side Comparison Viewer.
+
+2. **`tapnet_fusion.json`** *(Flagship Full Pipeline)*:
    * End-to-end multi-layer kinetic fusion and generative video stylization workflow.
    * **DeepMind TAPNet Lagrangian Point Tracking**: Tracks 128 surface points with occlusion-aware virtual pen lifting.
    * **Kinetic + TAPNet Brush Fusion**: Merges macro skeletal motion ribbons with micro surface filaments and particle embers.

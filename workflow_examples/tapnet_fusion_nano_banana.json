@@ -1,0 +1,3354 @@
+{
+  "last_node_id": 144,
+  "last_link_id": 46,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [
+        80,
+        140
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1,
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "Screen_Recording_dancing_dance.mp4",
+        "video"
+      ],
+      "title": "Source Human Dancing Video"
+    },
+    {
+      "id": 50,
+      "type": "KineticMotionCurveExtractor",
+      "pos": [
+        440,
+        140
+      ],
+      "size": [
+        360,
+        460
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video_or_images",
+          "name": "video_or_images",
+          "type": "*",
+          "link": 1
+        },
+        {
+          "localized_name": "spline_type",
+          "name": "spline_type",
+          "type": "COMBO",
+          "widget": {
+            "name": "spline_type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_window",
+          "name": "trail_window",
+          "type": "INT",
+          "widget": {
+            "name": "trail_window"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "stroke_base_thickness",
+          "name": "stroke_base_thickness",
+          "type": "INT",
+          "widget": {
+            "name": "stroke_base_thickness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "speed_to_width_factor",
+          "name": "speed_to_width_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "speed_to_width_factor"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "speed_to_brightness_factor",
+          "name": "speed_to_brightness_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "speed_to_brightness_factor"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "dense_optical_flow",
+          "name": "dense_optical_flow",
+          "type": "COMBO",
+          "widget": {
+            "name": "dense_optical_flow"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_smoothing",
+          "name": "temporal_smoothing",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_smoothing"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model_complexity",
+          "name": "model_complexity",
+          "type": "COMBO",
+          "widget": {
+            "name": "model_complexity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "motion_representation",
+          "name": "motion_representation",
+          "type": "IMAGE",
+          "links": [
+            12
+          ]
+        },
+        {
+          "localized_name": "stage_pipeline_grid",
+          "name": "stage_pipeline_grid",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        },
+        {
+          "localized_name": "1_segmentation_mask",
+          "name": "1_segmentation_mask",
+          "type": "IMAGE",
+          "links": [
+            7
+          ]
+        },
+        {
+          "localized_name": "2_pose_keypoints",
+          "name": "2_pose_keypoints",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "localized_name": "3_optical_flow",
+          "name": "3_optical_flow",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "localized_name": "4_bezier_splines",
+          "name": "4_bezier_splines",
+          "type": "IMAGE",
+          "links": [
+            10
+          ]
+        },
+        {
+          "localized_name": "motion_video_file",
+          "name": "motion_video_file",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "localized_name": "kinetic_motion_data",
+          "name": "kinetic_motion_data",
+          "type": "KINETIC_MOTION_DATA",
+          "links": [
+            3,
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KineticMotionCurveExtractor"
+      },
+      "widgets_values": [
+        "catmull_rom_spline",
+        20,
+        18,
+        1.8,
+        1.2,
+        "enable",
+        0.6,
+        "full",
+        24
+      ],
+      "title": "Google Kinetic Motion Curve Extractor"
+    },
+    {
+      "id": 70,
+      "type": "TAPNetKineticPointTracker",
+      "pos": [
+        900,
+        140
+      ],
+      "size": [
+        360,
+        420
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video_or_images",
+          "name": "video_or_images",
+          "type": "*",
+          "link": 2
+        },
+        {
+          "localized_name": "mask_or_images",
+          "name": "mask_or_images",
+          "type": "*",
+          "link": 3
+        },
+        {
+          "localized_name": "num_points",
+          "name": "num_points",
+          "type": "INT",
+          "widget": {
+            "name": "num_points"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "grid_sampling",
+          "name": "grid_sampling",
+          "type": "COMBO",
+          "widget": {
+            "name": "grid_sampling"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_history",
+          "name": "trail_history",
+          "type": "INT",
+          "widget": {
+            "name": "trail_history"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "point_radius",
+          "name": "point_radius",
+          "type": "INT",
+          "widget": {
+            "name": "point_radius"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_thickness",
+          "name": "trail_thickness",
+          "type": "INT",
+          "widget": {
+            "name": "trail_thickness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "color_scheme",
+          "name": "color_scheme",
+          "type": "COMBO",
+          "widget": {
+            "name": "color_scheme"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "occlusion_threshold",
+          "name": "occlusion_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "occlusion_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "point_tracking_overlay_frames",
+          "name": "point_tracking_overlay_frames",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
+        },
+        {
+          "localized_name": "tracking_video_file",
+          "name": "tracking_video_file",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "localized_name": "tapnet_tracks",
+          "name": "tapnet_tracks",
+          "type": "TAPNET_TRACKS",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TAPNetKineticPointTracker"
+      },
+      "widgets_values": [
+        128,
+        "dancer_silhouette",
+        24,
+        5,
+        3,
+        "radiant_red",
+        0.4,
+        24
+      ],
+      "title": "DeepMind TAPNet Lagrangian Point Tracker"
+    },
+    {
+      "id": 71,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        900,
+        590
+      ],
+      "size": [
+        360,
+        310
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Stage5_TAPNetSurfaceTracking"
+      ],
+      "title": "Stage 5: TAPNet Surface Point Tracking Preview"
+    },
+    {
+      "id": 60,
+      "type": "KineticTAPNetBrushFusionRenderer",
+      "pos": [
+        1350,
+        140
+      ],
+      "size": [
+        380,
+        520
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "motion_input",
+          "name": "motion_input",
+          "type": "*",
+          "link": 5
+        },
+        {
+          "localized_name": "tapnet_tracks",
+          "name": "tapnet_tracks",
+          "type": "*",
+          "link": 6
+        },
+        {
+          "localized_name": "skeletal_brush_weight",
+          "name": "skeletal_brush_weight",
+          "type": "FLOAT",
+          "widget": {
+            "name": "skeletal_brush_weight"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "tapnet_filament_weight",
+          "name": "tapnet_filament_weight",
+          "type": "FLOAT",
+          "widget": {
+            "name": "tapnet_filament_weight"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "tapnet_particle_density",
+          "name": "tapnet_particle_density",
+          "type": "FLOAT",
+          "widget": {
+            "name": "tapnet_particle_density"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_decay",
+          "name": "temporal_decay",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_decay"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "stroke_base_width",
+          "name": "stroke_base_width",
+          "type": "INT",
+          "widget": {
+            "name": "stroke_base_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filament_width",
+          "name": "filament_width",
+          "type": "INT",
+          "widget": {
+            "name": "filament_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "velocity_influence",
+          "name": "velocity_influence",
+          "type": "FLOAT",
+          "widget": {
+            "name": "velocity_influence"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "optical_flow_strength",
+          "name": "optical_flow_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "optical_flow_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "glow_strength",
+          "name": "glow_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "glow_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "occlusion_pen_lift",
+          "name": "occlusion_pen_lift",
+          "type": "COMBO",
+          "widget": {
+            "name": "occlusion_pen_lift"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "brush_color_mode",
+          "name": "brush_color_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "brush_color_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "brush_stroke_frames",
+          "name": "brush_stroke_frames",
+          "type": "IMAGE",
+          "links": [
+            13,
+            14,
+            19,
+            24,
+            29,
+            38,
+            45
+          ]
+        },
+        {
+          "localized_name": "kinetic_motion_data",
+          "name": "kinetic_motion_data",
+          "type": "KINETIC_MOTION_DATA",
+          "links": []
+        },
+        {
+          "localized_name": "dynamic_prompt_string",
+          "name": "dynamic_prompt_string",
+          "type": "STRING",
+          "links": [
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KineticTAPNetBrushFusionRenderer"
+      },
+      "widgets_values": [
+        1.2,
+        1.2,
+        0.6,
+        0.88,
+        24,
+        5,
+        1.8,
+        0.4,
+        0.6,
+        "enable",
+        "green_kinetic_red_tapnet",
+        24
+      ],
+      "title": "Kinetic + TAPNet Brush Fusion Renderer"
+    },
+    {
+      "id": 51,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1820,
+        120
+      ],
+      "size": [
+        270,
+        330
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Stage1_Segmentation"
+      ],
+      "title": "Stage 1: Human Segmentation Mask"
+    },
+    {
+      "id": 52,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2110,
+        120
+      ],
+      "size": [
+        270,
+        330
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Stage2_PoseKeypoints"
+      ],
+      "title": "Stage 2: MediaPipe 3D Pose Keypoints"
+    },
+    {
+      "id": 53,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2400,
+        120
+      ],
+      "size": [
+        270,
+        330
+      ],
+      "flags": {},
+      "order": 53,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Stage3_OpticalFlow"
+      ],
+      "title": "Stage 3: Dense Optical Flow Field"
+    },
+    {
+      "id": 54,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2690,
+        120
+      ],
+      "size": [
+        270,
+        330
+      ],
+      "flags": {},
+      "order": 54,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Stage4_BezierSplines"
+      ],
+      "title": "Stage 4: Converted Bezier Splines"
+    },
+    {
+      "id": 55,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2980,
+        120
+      ],
+      "size": [
+        420,
+        330
+      ],
+      "flags": {},
+      "order": 55,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "StagePipelineHUD"
+      ],
+      "title": "4-Stage Annotated 2x2 HUD Grid"
+    },
+    {
+      "id": 56,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1820,
+        480
+      ],
+      "size": [
+        270,
+        330
+      ],
+      "flags": {},
+      "order": 56,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 12
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Motion_Extractor_Clean"
+      ],
+      "title": "Clean Motion Extractor Output"
+    },
+    {
+      "id": 61,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2110,
+        480
+      ],
+      "size": [
+        420,
+        330
+      ],
+      "flags": {},
+      "order": 61,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 13
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "KineticBrushstrokes_Video1"
+      ],
+      "title": "Stage 6: Fused Kinetic + TAPNet Dynamic Brushstrokes Video"
+    },
+    {
+      "id": 101,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        1020
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 101,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 14
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            15
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        24,
+        1
+      ],
+      "title": "Extract Screenshot 1 (10% Timepoint (Frame 24))"
+    },
+    {
+      "id": 111,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        1210
+      ],
+      "size": [
+        280,
+        200
+      ],
+      "flags": {},
+      "order": 111,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            16
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_1.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 1 (Texture/Impasto)"
+    },
+    {
+      "id": 121,
+      "type": "ImageBatch",
+      "pos": [
+        390,
+        1100
+      ],
+      "size": [
+        200,
+        120
+      ],
+      "flags": {},
+      "order": 121,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 15
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 1 (Structure + Style)"
+    },
+    {
+      "id": 131,
+      "type": "GeminiImageNode",
+      "pos": [
+        630,
+        1020
+      ],
+      "size": [
+        420,
+        390
+      ],
+      "flags": {},
+      "order": 131,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 17
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            18,
+            34
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
+        "gemini-2.5-flash-image",
+        43,
+        "auto",
+        "IMAGE"
+      ],
+      "title": "Nano Banana Stylizer 1 (Keyframe 1 Stylization)"
+    },
+    {
+      "id": 141,
+      "type": "PreviewImage",
+      "pos": [
+        1080,
+        1020
+      ],
+      "size": [
+        280,
+        390
+      ],
+      "flags": {},
+      "order": 141,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 18
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 1 Preview"
+    },
+    {
+      "id": 102,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        1440
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 102,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 19
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            20
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        72,
+        1
+      ],
+      "title": "Extract Screenshot 2 (35% Timepoint (Frame 72))"
+    },
+    {
+      "id": 112,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        1630
+      ],
+      "size": [
+        280,
+        200
+      ],
+      "flags": {},
+      "order": 112,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            21
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_2.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 2 (Texture/Impasto)"
+    },
+    {
+      "id": 122,
+      "type": "ImageBatch",
+      "pos": [
+        390,
+        1520
+      ],
+      "size": [
+        200,
+        120
+      ],
+      "flags": {},
+      "order": 122,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 20
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 2 (Structure + Style)"
+    },
+    {
+      "id": 132,
+      "type": "GeminiImageNode",
+      "pos": [
+        630,
+        1440
+      ],
+      "size": [
+        420,
+        390
+      ],
+      "flags": {},
+      "order": 132,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23,
+            35
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
+        "gemini-2.5-flash-image",
+        44,
+        "auto",
+        "IMAGE"
+      ],
+      "title": "Nano Banana Stylizer 2 (Keyframe 2 Stylization)"
+    },
+    {
+      "id": 142,
+      "type": "PreviewImage",
+      "pos": [
+        1080,
+        1440
+      ],
+      "size": [
+        280,
+        390
+      ],
+      "flags": {},
+      "order": 142,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 23
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 2 Preview"
+    },
+    {
+      "id": 103,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        1860
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 103,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 24
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            25
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        120,
+        1
+      ],
+      "title": "Extract Screenshot 3 (60% Timepoint (Frame 120))"
+    },
+    {
+      "id": 113,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        2050
+      ],
+      "size": [
+        280,
+        200
+      ],
+      "flags": {},
+      "order": 113,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            26
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_3.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 3 (Texture/Impasto)"
+    },
+    {
+      "id": 123,
+      "type": "ImageBatch",
+      "pos": [
+        390,
+        1940
+      ],
+      "size": [
+        200,
+        120
+      ],
+      "flags": {},
+      "order": 123,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 25
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            27
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 3 (Structure + Style)"
+    },
+    {
+      "id": 133,
+      "type": "GeminiImageNode",
+      "pos": [
+        630,
+        1860
+      ],
+      "size": [
+        420,
+        390
+      ],
+      "flags": {},
+      "order": 133,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 27
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            28,
+            36
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
+        "gemini-2.5-flash-image",
+        45,
+        "auto",
+        "IMAGE"
+      ],
+      "title": "Nano Banana Stylizer 3 (Keyframe 3 Stylization)"
+    },
+    {
+      "id": 143,
+      "type": "PreviewImage",
+      "pos": [
+        1080,
+        1860
+      ],
+      "size": [
+        280,
+        390
+      ],
+      "flags": {},
+      "order": 143,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 28
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 3 Preview"
+    },
+    {
+      "id": 104,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        2280
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 104,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 29
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            30
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        168,
+        1
+      ],
+      "title": "Extract Screenshot 4 (85% Timepoint (Frame 168))"
+    },
+    {
+      "id": 114,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        2470
+      ],
+      "size": [
+        280,
+        200
+      ],
+      "flags": {},
+      "order": 114,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            31
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_4.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 4 (Texture/Impasto)"
+    },
+    {
+      "id": 124,
+      "type": "ImageBatch",
+      "pos": [
+        390,
+        2360
+      ],
+      "size": [
+        200,
+        120
+      ],
+      "flags": {},
+      "order": 124,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 30
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 31
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            32
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 4 (Structure + Style)"
+    },
+    {
+      "id": 134,
+      "type": "GeminiImageNode",
+      "pos": [
+        630,
+        2280
+      ],
+      "size": [
+        420,
+        390
+      ],
+      "flags": {},
+      "order": 134,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            33,
+            37
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
+        "gemini-2.5-flash-image",
+        46,
+        "auto",
+        "IMAGE"
+      ],
+      "title": "Nano Banana Stylizer 4 (Keyframe 4 Stylization)"
+    },
+    {
+      "id": 144,
+      "type": "PreviewImage",
+      "pos": [
+        1080,
+        2280
+      ],
+      "size": [
+        280,
+        390
+      ],
+      "flags": {},
+      "order": 144,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 33
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 4 Preview"
+    },
+    {
+      "id": 4,
+      "type": "ImageBatchMulti",
+      "pos": [
+        1400,
+        1020
+      ],
+      "size": [
+        280,
+        220
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image_1",
+          "name": "image_1",
+          "type": "IMAGE",
+          "link": 34
+        },
+        {
+          "localized_name": "image_2",
+          "name": "image_2",
+          "type": "IMAGE",
+          "link": 35
+        },
+        {
+          "localized_name": "image_3",
+          "name": "image_3",
+          "type": "IMAGE",
+          "link": 36
+        },
+        {
+          "localized_name": "image_4",
+          "name": "image_4",
+          "type": "IMAGE",
+          "link": 37
+        },
+        {
+          "localized_name": "inputcount",
+          "name": "inputcount",
+          "type": "INT",
+          "widget": {
+            "name": "inputcount"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            39
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatchMulti"
+      },
+      "widgets_values": [
+        4
+      ],
+      "title": "4 Nano Banana Stylized References (Image1..Image4)"
+    },
+    {
+      "id": 5,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        1400,
+        1280
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "Masterpiece self-moving animated oil painting on deep black canvas. Interpret the vibrant neon green kinetic ribbons as dynamic, sweeping strokes of rich emerald and cadmium green impasto oil paint with visible palette-knife textures and heavy physical relief. Interpret every single radiant glowing red tracking dot and filament as an autonomous droplet of glistening, thick crimson and vermilion oil paint that blooms and swirls into fine wet filaments with glowing embers. Condition the global painterly style, impasto depth, tactile brush textures, and lighting strictly on the four stylized keyframe references (Image1 through Image4). As the dancer moves, the green structural ribbons and red surface filaments self-paint across the scene, blending rich green and crimson paint against the pure dark void with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+      ],
+      "title": "Motion Stylization Prompt"
+    },
+    {
+      "id": 6,
+      "type": "GeminiJobBatcher",
+      "pos": [
+        1720,
+        1020
+      ],
+      "size": [
+        420,
+        560
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "jobs",
+          "name": "jobs",
+          "type": "INT",
+          "widget": {
+            "name": "jobs"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image_stream_1",
+          "name": "image_stream_1",
+          "type": "*",
+          "link": 38
+        },
+        {
+          "localized_name": "image_stream_2",
+          "name": "image_stream_2",
+          "type": "*",
+          "link": 39
+        },
+        {
+          "localized_name": "text_stream_3",
+          "name": "text_stream_3",
+          "type": "*",
+          "link": 40
+        },
+        {
+          "localized_name": "text_stream_4",
+          "name": "text_stream_4",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "stream",
+          "name": "stream",
+          "type": "GEMINI_STREAM",
+          "links": [
+            41
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiJobBatcher"
+      },
+      "widgets_values": [
+        1,
+        "[{\"id\": 1, \"type\": \"IMAGE\", \"prefix\": \"\", \"delim\": \"\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 1, \"cycle\": \"iterate\", \"index\": 0, \"muted\": false, \"mode\": \"video\", \"fps\": 24, \"_auto_mode_set\": true, \"_displayLabel\": \"Video1\"}, {\"id\": 2, \"type\": \"IMAGE\", \"prefix\": \"\", \"delim\": \"\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 4, \"cycle\": \"iterate\", \"index\": 0, \"muted\": false, \"mode\": \"images\", \"fps\": 24, \"_auto_mode_set\": true, \"_displayLabel\": \"Image1\"}, {\"id\": 3, \"type\": \"STRING\", \"delim\": \"\n\", \"prefix\": \"\", \"suffix\": \"\", \"muted\": false, \"_displayLabel\": \"Text1\"}]",
+        "",
+        ""
+      ],
+      "title": "Gemini Job Batcher (Stage 6 Video + 4 Nano Banana Images + Prompt)"
+    },
+    {
+      "id": 7,
+      "type": "GeminiAuthConfig",
+      "pos": [
+        2180,
+        1020
+      ],
+      "size": [
+        360,
+        160
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "project_id",
+          "name": "project_id",
+          "type": "STRING",
+          "widget": {
+            "name": "project_id"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "location",
+          "name": "location",
+          "type": "COMBO",
+          "widget": {
+            "name": "location"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "service_account_json_path",
+          "name": "service_account_json_path",
+          "type": "STRING",
+          "widget": {
+            "name": "service_account_json_path"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "api_key",
+          "name": "api_key",
+          "type": "STRING",
+          "widget": {
+            "name": "api_key"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "auth_config",
+          "name": "auth_config",
+          "type": "GEMINI_AUTH",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiAuthConfig"
+      },
+      "widgets_values": [
+        "creativelab-prototypes",
+        "global",
+        "",
+        ""
+      ],
+      "title": "Gemini Auth Config (Vertex AI)"
+    },
+    {
+      "id": 8,
+      "type": "GeminiOmniModel",
+      "pos": [
+        2180,
+        1220
+      ],
+      "size": [
+        520,
+        520
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "stream",
+          "name": "stream",
+          "type": "*",
+          "link": 41
+        },
+        {
+          "localized_name": "gcs_bucket",
+          "name": "gcs_bucket",
+          "type": "STRING",
+          "widget": {
+            "name": "gcs_bucket"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "auth_config",
+          "name": "auth_config",
+          "type": "GEMINI_AUTH",
+          "link": 42
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "text",
+          "name": "text",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            44,
+            46
+          ]
+        },
+        {
+          "localized_name": "response",
+          "name": "response",
+          "type": "GEMINI_RESPONSE",
+          "links": [
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiOmniModel"
+      },
+      "widgets_values": [
+        "",
+        "{\"model_name\": \"gemini-omni-flash-preview\", \"task\": \"video_editing\", \"duration\": 8, \"aspect_ratio\": \"1:1\", \"delivery\": \"base64\", \"prefix_text\": \"\", \"suffix_text\": \"\", \"image_roles\": {\"Image1\": \"reference\", \"Image2\": \"reference\", \"Image3\": \"reference\", \"Image4\": \"reference\"}}"
+      ],
+      "title": "Gemini Omni Model (Brushstroke Video-to-Art Stylization)"
+    },
+    {
+      "id": 10,
+      "type": "GeminiMultimodalPreview",
+      "pos": [
+        2180,
+        1780
+      ],
+      "size": [
+        360,
+        220
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "response",
+          "name": "response",
+          "type": "*",
+          "link": 43
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "GeminiMultimodalPreview"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "Gemini Metadata & Response Preview"
+    },
+    {
+      "id": 31,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2740,
+        1020
+      ],
+      "size": [
+        420,
+        330
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 44
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "StylizedKineticArt_NanoBanana"
+      ],
+      "title": "Final Stylized Kinetic Artwork Video (Omni Render)"
+    },
+    {
+      "id": 80,
+      "type": "KineticDualComparisonViewer",
+      "pos": [
+        2740,
+        1390
+      ],
+      "size": [
+        520,
+        360
+      ],
+      "flags": {},
+      "order": 80,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "stage6_fused_brushstrokes",
+          "name": "stage6_fused_brushstrokes",
+          "type": "IMAGE",
+          "link": 45
+        },
+        {
+          "localized_name": "final_stylized_artwork",
+          "name": "final_stylized_artwork",
+          "type": "IMAGE",
+          "link": 46
+        },
+        {
+          "localized_name": "layout",
+          "name": "layout",
+          "type": "STRING",
+          "widget": {
+            "name": "layout"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "show_labels",
+          "name": "show_labels",
+          "type": "STRING",
+          "widget": {
+            "name": "show_labels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "label_left",
+          "name": "label_left",
+          "type": "STRING",
+          "widget": {
+            "name": "label_left"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "label_right",
+          "name": "label_right",
+          "type": "STRING",
+          "widget": {
+            "name": "label_right"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "STRING",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "comparison_frames",
+          "name": "comparison_frames",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "comparison_video_file",
+          "name": "comparison_video_file",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KineticDualComparisonViewer"
+      },
+      "widgets_values": [
+        "side_by_side_horizontal",
+        "enable",
+        "Stage 6: Fused Brushstrokes",
+        "Final Stylized Artwork",
+        24,
+        "mp4",
+        true,
+        "Dual_Kinetic_Comparison_NanoBanana"
+      ],
+      "title": "Dual Output Viewer (Stage 6 + Final Art Side-by-Side)"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      50,
+      0,
+      "VIDEO"
+    ],
+    [
+      2,
+      1,
+      0,
+      70,
+      0,
+      "*"
+    ],
+    [
+      3,
+      50,
+      7,
+      70,
+      1,
+      "*"
+    ],
+    [
+      4,
+      70,
+      0,
+      71,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      50,
+      7,
+      60,
+      0,
+      "KINETIC_MOTION_DATA"
+    ],
+    [
+      6,
+      70,
+      2,
+      60,
+      1,
+      "*"
+    ],
+    [
+      7,
+      50,
+      2,
+      51,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      50,
+      3,
+      52,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      50,
+      4,
+      53,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      50,
+      5,
+      54,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      50,
+      1,
+      55,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      50,
+      0,
+      56,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      60,
+      0,
+      61,
+      0,
+      "IMAGE"
+    ],
+    [
+      14,
+      60,
+      0,
+      101,
+      0,
+      "IMAGE"
+    ],
+    [
+      15,
+      101,
+      0,
+      121,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      111,
+      0,
+      121,
+      1,
+      "IMAGE"
+    ],
+    [
+      17,
+      121,
+      0,
+      131,
+      0,
+      "IMAGE"
+    ],
+    [
+      18,
+      131,
+      0,
+      141,
+      0,
+      "IMAGE"
+    ],
+    [
+      19,
+      60,
+      0,
+      102,
+      0,
+      "IMAGE"
+    ],
+    [
+      20,
+      102,
+      0,
+      122,
+      0,
+      "IMAGE"
+    ],
+    [
+      21,
+      112,
+      0,
+      122,
+      1,
+      "IMAGE"
+    ],
+    [
+      22,
+      122,
+      0,
+      132,
+      0,
+      "IMAGE"
+    ],
+    [
+      23,
+      132,
+      0,
+      142,
+      0,
+      "IMAGE"
+    ],
+    [
+      24,
+      60,
+      0,
+      103,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      103,
+      0,
+      123,
+      0,
+      "IMAGE"
+    ],
+    [
+      26,
+      113,
+      0,
+      123,
+      1,
+      "IMAGE"
+    ],
+    [
+      27,
+      123,
+      0,
+      133,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      133,
+      0,
+      143,
+      0,
+      "IMAGE"
+    ],
+    [
+      29,
+      60,
+      0,
+      104,
+      0,
+      "IMAGE"
+    ],
+    [
+      30,
+      104,
+      0,
+      124,
+      0,
+      "IMAGE"
+    ],
+    [
+      31,
+      114,
+      0,
+      124,
+      1,
+      "IMAGE"
+    ],
+    [
+      32,
+      124,
+      0,
+      134,
+      0,
+      "IMAGE"
+    ],
+    [
+      33,
+      134,
+      0,
+      144,
+      0,
+      "IMAGE"
+    ],
+    [
+      34,
+      131,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      35,
+      132,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      36,
+      133,
+      0,
+      4,
+      2,
+      "IMAGE"
+    ],
+    [
+      37,
+      134,
+      0,
+      4,
+      3,
+      "IMAGE"
+    ],
+    [
+      38,
+      60,
+      0,
+      6,
+      1,
+      "IMAGE"
+    ],
+    [
+      39,
+      4,
+      0,
+      6,
+      2,
+      "IMAGE"
+    ],
+    [
+      40,
+      60,
+      2,
+      6,
+      3,
+      "STRING"
+    ],
+    [
+      41,
+      6,
+      0,
+      8,
+      0,
+      "GEMINI_STREAM"
+    ],
+    [
+      42,
+      7,
+      0,
+      8,
+      2,
+      "GEMINI_AUTH"
+    ],
+    [
+      43,
+      8,
+      2,
+      10,
+      0,
+      "GEMINI_RESPONSE"
+    ],
+    [
+      44,
+      8,
+      1,
+      31,
+      0,
+      "IMAGE"
+    ],
+    [
+      45,
+      60,
+      0,
+      80,
+      0,
+      "IMAGE"
+    ],
+    [
+      46,
+      8,
+      1,
+      80,
+      1,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Dancing Video Input & Google Kinetic Motion Curve Extractor",
+      "bounding": [
+        40,
+        60,
+        800,
+        870
+      ],
+      "color": "#3f51b5",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. DeepMind TAPNet Lagrangian Point Tracker & Preview",
+      "bounding": [
+        860,
+        60,
+        440,
+        870
+      ],
+      "color": "#00bcd4",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. Kinetic + TAPNet Brush Fusion Renderer",
+      "bounding": [
+        1320,
+        60,
+        440,
+        870
+      ],
+      "color": "#ff9800",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. Intermediate Previews Suite (Stages 1-5 | 2x2 HUD Diagnostic Grid | Stage 6 Fused Video)",
+      "bounding": [
+        1780,
+        60,
+        1660,
+        870
+      ],
+      "color": "#9c27b0",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. Keyframe Extraction & Nano Banana Image Stylizers (Step 6 Screenshots + 4 Oil Style References)",
+      "bounding": [
+        40,
+        960,
+        1340,
+        1750
+      ],
+      "color": "#4caf50",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "6. Multimodal Batching & Gemini Omni Stylization (4 Nano Banana Keyframes + Video Conditioning)",
+      "bounding": [
+        1400,
+        960,
+        1300,
+        1070
+      ],
+      "color": "#e91e63",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 7,
+      "title": "7. Final Stylized Artwork & Synchronized Side-by-Side Dual Comparison Player",
+      "bounding": [
+        2720,
+        960,
+        560,
+        1070
+      ],
+      "color": "#673ab7",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
