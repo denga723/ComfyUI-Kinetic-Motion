@@ -1,6 +1,6 @@
 {
   "last_node_id": 200,
-  "last_link_id": 57,
+  "last_link_id": 58,
   "nodes": [
     {
       "id": 1,
@@ -332,7 +332,8 @@
           "name": "point_tracking_overlay_frames",
           "type": "IMAGE",
           "links": [
-            4
+            4,
+            56
           ]
         },
         {
@@ -597,7 +598,7 @@
             32,
             42,
             49,
-            56
+            57
           ]
         },
         {
@@ -2815,7 +2816,7 @@
           "links": [
             48,
             50,
-            57
+            58
           ]
         },
         {
@@ -3081,14 +3082,14 @@
     },
     {
       "id": 200,
-      "type": "KineticSevenStagePipelineViewer",
+      "type": "KineticEightStagePipelineViewer",
       "pos": [
         3620,
         1880
       ],
       "size": [
         540,
-        520
+        560
       ],
       "flags": {},
       "order": 200,
@@ -3125,16 +3126,22 @@
           "link": 55
         },
         {
+          "localized_name": "tapnet_point_tracker",
+          "name": "tapnet_point_tracker",
+          "type": "*",
+          "link": 56
+        },
+        {
           "localized_name": "fuser_brushstrokes",
           "name": "fuser_brushstrokes",
           "type": "*",
-          "link": 56
+          "link": 57
         },
         {
           "localized_name": "gemini_omni_artwork",
           "name": "gemini_omni_artwork",
           "type": "*",
-          "link": 57
+          "link": 58
         },
         {
           "localized_name": "layout",
@@ -3193,8 +3200,8 @@
       ],
       "outputs": [
         {
-          "localized_name": "seven_stage_preview",
-          "name": "seven_stage_preview",
+          "localized_name": "eight_stage_preview",
+          "name": "eight_stage_preview",
           "type": "IMAGE",
           "links": []
         },
@@ -3206,17 +3213,17 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticSevenStagePipelineViewer"
+        "Node name for S&R": "KineticEightStagePipelineViewer"
       },
       "widgets_values": [
-        "grid_2x4_omni_featured",
+        "grid_2x4",
         "enable",
         24,
         "mp4",
         true,
-        "Seven_Stage_Kinetic_Pipeline"
+        "Eight_Stage_Kinetic_Pipeline"
       ],
-      "title": "7-Stage Full Pipeline Multi-Video Preview (All 7 Stages)"
+      "title": "8-Stage Full Pipeline Multi-Video Preview (All 8 Stages)"
     }
   ],
   "links": [
@@ -3662,7 +3669,7 @@
     ],
     [
       56,
-      60,
+      70,
       0,
       200,
       5,
@@ -3670,10 +3677,18 @@
     ],
     [
       57,
+      60,
+      0,
+      200,
+      6,
+      "IMAGE"
+    ],
+    [
+      58,
       8,
       1,
       200,
-      6,
+      7,
       "IMAGE"
     ]
   ],

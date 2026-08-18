@@ -3164,17 +3164,18 @@ class KineticDualComparisonViewer:
         }
 
 
-class KineticSevenStagePipelineViewer:
+class KineticEightStagePipelineViewer:
     """
-    Seven-Stage Kinetic Pipeline Multi-Panel Comparison & Synchronizer.
-    Combines all 7 stages:
+    Eight-Stage Kinetic Pipeline Multi-Panel Comparison & Synchronizer.
+    Combines all 8 stages:
       1. Original Video
       2. Human Segmentation Mask
       3. Dense Optical Flow Field
       4. Converted Bezier Splines
       5. Clean Motion Extractor (Macro Skeletal Curves)
-      6. TAPNet Kinetic Brush Fusion Renderer
-      7. Gemini Omni Final Artwork
+      6. TAPNet Point Tracker Video
+      7. TAPNet + Kinetic Brush Fusion Renderer
+      8. Gemini Omni Final Artwork
     into a unified multi-panel HUD video with live inline preview.
     """
     def __init__(self):
@@ -3185,30 +3186,31 @@ class KineticSevenStagePipelineViewer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "original_video": (ANY_TYPE, {"tooltip": "1. Original source dancer/motion video (accepts IMAGE tensor or VIDEO path)"}),
+                "original_video": (ANY_TYPE, {"tooltip": "1. Original source dancer/motion video"}),
                 "human_segmentation": (ANY_TYPE, {"tooltip": "2. Stage 1 Segmentation mask"}),
                 "dense_optical_flow": (ANY_TYPE, {"tooltip": "3. Stage 3 Dense optical flow vector field"}),
                 "converted_bezier": (ANY_TYPE, {"tooltip": "4. Stage 4 Bezier spline trajectory curves"}),
                 "clean_motion_extractor": (ANY_TYPE, {"tooltip": "5. Stage 5 Macro skeletal kinetic motion curves"}),
-                "fuser_brushstrokes": (ANY_TYPE, {"tooltip": "6. Stage 6 Fused TAPNet + Kinetic physical brushstrokes"}),
-                "gemini_omni_artwork": (ANY_TYPE, {"tooltip": "7. Final Stylized Masterpiece Video from Gemini Omni"}),
+                "tapnet_point_tracker": (ANY_TYPE, {"tooltip": "6. Stage 6 DeepMind TAPNet point tracker video"}),
+                "fuser_brushstrokes": (ANY_TYPE, {"tooltip": "7. Stage 7 Fused TAPNet + Kinetic physical brushstrokes"}),
+                "gemini_omni_artwork": (ANY_TYPE, {"tooltip": "8. Stage 8 Final Stylized Masterpiece Video from Gemini Omni"}),
             },
             "optional": {
-                "layout": (["grid_2x4_omni_featured", "grid_2x4_equal", "strip_horizontal"], {"default": "grid_2x4_omni_featured"}),
+                "layout": (["grid_2x4", "strip_horizontal"], {"default": "grid_2x4"}),
                 "show_hud_labels": (["enable", "disable"], {"default": "enable"}),
                 "frame_rate": ("INT", {"default": 24, "min": 1, "max": 60}),
                 "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
                 "save_output": ("BOOLEAN", {"default": True}),
-                "filename_prefix": ("STRING", {"default": "Seven_Stage_Kinetic_Pipeline"}),
+                "filename_prefix": ("STRING", {"default": "Eight_Stage_Kinetic_Pipeline"}),
             }
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("seven_stage_preview", "video_path")
+    RETURN_NAMES = ("eight_stage_preview", "video_path")
     OUTPUT_NODE = True
-    FUNCTION = "create_seven_stage_preview"
+    FUNCTION = "create_eight_stage_preview"
     CATEGORY = "kinetic_motion"
-    DESCRIPTION = "Combines all 7 stages of the Kinetic Motion & Gemini pipeline into a unified multi-panel synchronization video."
+    DESCRIPTION = "Combines all 8 stages of the Kinetic Motion, TAPNet, & Gemini pipeline into a unified multi-panel synchronization video."
 
     def _extract_frames_from_input(self, inp):
         if inp is None:
@@ -3252,21 +3254,22 @@ class KineticSevenStagePipelineViewer:
                 
         return []
 
-    def create_seven_stage_preview(
+    def create_eight_stage_preview(
         self,
         original_video: Any,
         human_segmentation: Any,
         dense_optical_flow: Any,
         converted_bezier: Any,
         clean_motion_extractor: Any,
+        tapnet_point_tracker: Any,
         fuser_brushstrokes: Any,
         gemini_omni_artwork: Any,
-        layout: str = "grid_2x4_omni_featured",
+        layout: str = "grid_2x4",
         show_hud_labels: str = "enable",
         frame_rate: int = 24,
         format: str = "mp4",
         save_output: bool = True,
-        filename_prefix: str = "Seven_Stage_Kinetic_Pipeline"
+        filename_prefix: str = "Eight_Stage_Kinetic_Pipeline"
     ):
         raw_inputs = [
             original_video,
@@ -3274,6 +3277,7 @@ class KineticSevenStagePipelineViewer:
             dense_optical_flow,
             converted_bezier,
             clean_motion_extractor,
+            tapnet_point_tracker,
             fuser_brushstrokes,
             gemini_omni_artwork
         ]
@@ -3284,8 +3288,9 @@ class KineticSevenStagePipelineViewer:
             "3. Dense Optical Flow",
             "4. Converted Bezier",
             "5. Clean Motion Extractor",
-            "6. TAPNet Kinetic Fuser",
-            "7. Gemini Omni Final Art"
+            "6. TAPNet Point Tracker",
+            "7. Kinetic + TAPNet Fuser",
+            "8. Gemini Omni Final Art"
         ]
 
         stage_colors = [
@@ -3294,6 +3299,7 @@ class KineticSevenStagePipelineViewer:
             (255, 60, 180),  # Magenta
             (80, 240, 120),  # Emerald
             (0, 230, 255),   # Bright Cyan
+            (255, 80, 80),   # Radiant Red
             (0, 255, 160),   # Neon Green
             (255, 200, 40)   # Gold
         ]
@@ -3301,7 +3307,7 @@ class KineticSevenStagePipelineViewer:
         parsed_streams = [self._extract_frames_from_input(inp) for inp in raw_inputs]
         valid_counts = [len(s) for s in parsed_streams if len(s) > 0]
         if not valid_counts:
-            raise ValueError("[KineticSevenStagePipelineViewer] No frames found across the 7 inputs.")
+            raise ValueError("[KineticEightStagePipelineViewer] No frames found across the 8 inputs.")
         num_frames = min(valid_counts)
 
         cell_w, cell_h = 480, 270 # Standard 16:9 cell
@@ -3310,48 +3316,11 @@ class KineticSevenStagePipelineViewer:
         pil_frames = []
 
         for fi in range(num_frames):
-            if layout == "grid_2x4_omni_featured":
+            if layout == "grid_2x4":
                 canvas_w, canvas_h = cell_w * 4, cell_h * 2
                 canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
 
-                # Top Row: Stages 1, 2, 3, 4
-                for i in range(4):
-                    stream = parsed_streams[i]
-                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
-                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
-                    if show_hud_labels == "enable":
-                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
-                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
-                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-                    canvas[0:cell_h, i*cell_w:(i+1)*cell_w] = f_r
-
-                # Bottom Row: Stages 5, 6
-                for i in [4, 5]:
-                    c_idx = i - 4
-                    stream = parsed_streams[i]
-                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
-                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
-                    if show_hud_labels == "enable":
-                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
-                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
-                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-                    canvas[cell_h:canvas_h, c_idx*cell_w:(c_idx+1)*cell_w] = f_r
-
-                # Bottom-Right Featured Wide: Stage 7 (Gemini Omni Artwork across 2 columns)
-                stream7 = parsed_streams[6]
-                f7_np = stream7[fi] if fi < len(stream7) else np.zeros((cell_h, cell_w * 2, 3), dtype=np.uint8)
-                f7_r = cv2.resize(f7_np, (cell_w * 2, cell_h), interpolation=cv2.INTER_AREA)
-                if show_hud_labels == "enable":
-                    cv2.rectangle(f7_r, (0, 0), (cell_w * 2, 24), (12, 14, 18), -1)
-                    cv2.line(f7_r, (0, 24), (cell_w * 2, 24), stage_colors[6], 2)
-                    cv2.putText(f7_r, stage_labels[6] + " (Omni Masterpiece)", (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 220, 60), 1, cv2.LINE_AA)
-                canvas[cell_h:canvas_h, 2*cell_w:4*cell_w] = f7_r
-
-            elif layout == "grid_2x4_equal":
-                canvas_w, canvas_h = cell_w * 4, cell_h * 2
-                canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
-
-                for i in range(7):
+                for i in range(8):
                     row = i // 4
                     col = i % 4
                     stream = parsed_streams[i]
@@ -3360,33 +3329,28 @@ class KineticSevenStagePipelineViewer:
                     if show_hud_labels == "enable":
                         cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
                         cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
-                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                        is_art = (i == 7)
+                        font_color = (255, 220, 60) if is_art else (255, 255, 255)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, font_color, 1, cv2.LINE_AA)
                     canvas[row*cell_h:(row+1)*cell_h, col*cell_w:(col+1)*cell_w] = f_r
 
-                # Slot 8: Telemetry Badge
-                slot8 = np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
-                cv2.rectangle(slot8, (0, 0), (cell_w, 24), (12, 14, 18), -1)
-                cv2.putText(slot8, "8. Pipeline Telemetry", (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 200, 220), 1, cv2.LINE_AA)
-                cv2.putText(slot8, "7-STAGE KINETIC PIPELINE", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 240, 255), 2, cv2.LINE_AA)
-                cv2.putText(slot8, f"Frame: {fi+1}/{num_frames} @ {frame_rate}fps", (20, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 220, 240), 1, cv2.LINE_AA)
-                cv2.putText(slot8, "MediaPipe + TAPNet + Gemini", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 140), 1, cv2.LINE_AA)
-                canvas[cell_h:canvas_h, 3*cell_w:4*cell_w] = slot8
-
             else: # strip_horizontal
-                canvas_w, canvas_h = cell_w * 7, cell_h
+                canvas_w, canvas_h = cell_w * 8, cell_h
                 canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
-                for i in range(7):
+                for i in range(8):
                     stream = parsed_streams[i]
                     f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
                     f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
                     if show_hud_labels == "enable":
                         cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
                         cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
-                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                        is_art = (i == 7)
+                        font_color = (255, 220, 60) if is_art else (255, 255, 255)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, font_color, 1, cv2.LINE_AA)
                     canvas[0:cell_h, i*cell_w:(i+1)*cell_w] = f_r
 
             comp_frames.append(canvas.astype(np.float32) / 255.0)
-            if format in ["animated_webp", "gif"] or True: # Keep small pil frames for fast preview
+            if format in ["animated_webp", "gif"] or True:
                 pil_frames.append(Image.fromarray(canvas))
 
         out_tensor = torch.from_numpy(np.array(comp_frames, dtype=np.float32))
@@ -3414,7 +3378,6 @@ class KineticSevenStagePipelineViewer:
             preview_webp_name = f"{filename}_{counter:05d}_preview.webp"
             preview_path = os.path.join(full_output_folder, preview_webp_name)
             duration_ms = int(1000.0 / max(1, frame_rate))
-            # Subsample preview if long to keep inline preview lightning fast
             step = max(1, len(pil_frames) // 120) if len(pil_frames) > 120 else 1
             prev_sub = [pil_frames[idx].resize((canvas_w // 2, canvas_h // 2), Image.Resampling.LANCZOS) for idx in range(0, len(pil_frames), step)]
             prev_sub[0].save(preview_path, save_all=True, append_images=prev_sub[1:], duration=duration_ms * step, loop=0, quality=80)
@@ -3436,11 +3399,15 @@ class KineticSevenStagePipelineViewer:
             prev_sub[0].save(saved_path, save_all=True, append_images=prev_sub[1:], duration=duration_ms * step, loop=0, optimize=True)
             ui_results.append({"filename": gif_filename, "subfolder": subfolder, "type": type_str, "format": "image/gif"})
 
-        print(f"[KineticSevenStagePipelineViewer] Rendered 7-stage pipeline synchronization ({canvas_w}x{canvas_h}, {num_frames} frames) to {saved_path}")
+        print(f"[KineticEightStagePipelineViewer] Rendered 8-stage pipeline synchronization ({canvas_w}x{canvas_h}, {num_frames} frames) to {saved_path}")
         return {
             "ui": {"images": ui_results},
             "result": (out_tensor, saved_path)
         }
+
+
+# Alias for backward compatibility
+KineticSevenStagePipelineViewer = KineticEightStagePipelineViewer
 
 
 NODE_CLASS_MAPPINGS = {
@@ -3459,8 +3426,10 @@ NODE_CLASS_MAPPINGS = {
     "TAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer,
     "KineticDualComparisonViewer": KineticDualComparisonViewer,
     "DualVideoComparisonViewer": KineticDualComparisonViewer,
-    "KineticSevenStagePipelineViewer": KineticSevenStagePipelineViewer,
-    "SevenStagePipelineViewer": KineticSevenStagePipelineViewer
+    "KineticEightStagePipelineViewer": KineticEightStagePipelineViewer,
+    "EightStagePipelineViewer": KineticEightStagePipelineViewer,
+    "KineticSevenStagePipelineViewer": KineticEightStagePipelineViewer,
+    "SevenStagePipelineViewer": KineticEightStagePipelineViewer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -3479,6 +3448,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TAPNetBrushFusionRenderer": "TAPNet Brush Fusion Renderer",
     "KineticDualComparisonViewer": "Kinetic Dual Comparison Viewer (Stage 6 + Final Art)",
     "DualVideoComparisonViewer": "Dual Video Comparison Viewer",
-    "KineticSevenStagePipelineViewer": "Kinetic Seven-Stage Pipeline Viewer (All 7 Stages)",
-    "SevenStagePipelineViewer": "Seven-Stage Pipeline Viewer"
+    "KineticEightStagePipelineViewer": "Kinetic 8-Stage Pipeline Viewer (All 8 Stages)",
+    "EightStagePipelineViewer": "8-Stage Pipeline Viewer",
+    "KineticSevenStagePipelineViewer": "Kinetic 8-Stage Pipeline Viewer (Legacy Alias)",
+    "SevenStagePipelineViewer": "8-Stage Pipeline Viewer (Legacy Alias)"
 }
