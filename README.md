@@ -48,15 +48,27 @@ Designed specifically for AI animation, video-to-video generative stylization, a
 * **Occlusion-Aware Virtual Pen Lifting**: Automatically lifts the brush off canvas and tapers filaments when surface points become occluded behind the body.
 * **Kinetic Particle Embers**: Spawns dynamic glowing embers and sparks from high-velocity surface points.
 
+### 5. **Kinetic Multi-Stage Video Viewers & Comparison**
+* **`KineticEightStagePipelineViewer` (8-Stage Full Pipeline Multi-Video Preview)**:
+  - Composites all 8 pipeline stages into a unified, synchronized $2 \times 4$ HUD comparison video with live inline preview:
+    1. Original Source Dancer Video
+    2. Stage 1 Human Silhouette Segmentation
+    3. Stage 3 Dense Optical Flow Velocity Field
+    4. Stage 4 Converted Bézier Spline Curves
+    5. Stage 5 Clean Motion Extractor (Macro Skeletal Ribbons)
+    6. Stage 6 DeepMind TAPNet Point Tracking
+    7. Stage 7 Fused TAPNet + Kinetic Physical Brushstrokes
+    8. Stage 8 Gemini Omni Final Stylized Masterpiece Video
+  - Dynamic glowing color-coded HUD stage banners and automatic frame synchronization.
+  - Universal `ANY_TYPE` input parsing accepting `VIDEO` file paths, `IMAGE` batches, or video frames.
+* **`KineticDualComparisonViewer`**:
+  - Creates a synchronized side-by-side or stacked split-screen comparison between Stage 7 Fused Brushstrokes and the Final Stylized Artwork.
+* **`KineticVideoCombine` / `GeminiVideoCombine`**:
+  - Combines frame batches into `.mp4`, animated `.webp`, or `.gif` with instant inline playback.
+
 ---
 
-### 5. **Kinetic Video Combine & Preview** (`KineticVideoCombine` / `GeminiVideoCombine`)
-* Combines frame batches into `.mp4`, animated `.webp`, or `.gif`.
-* Renders instant inline animated previews directly in the ComfyUI node interface without requiring third-party video preview suites.
-
----
-
-### 4. **Gemini Enterprise & Multimodal Suite**
+### 6. **Gemini Enterprise & Multimodal Suite**
 * **`GeminiOmniModel` & `GeminiProModel`**: Connects ComfyUI directly to Google Gemini Multimodal / Omni models for video and image stylization, analysis, and prompting.
 * **`GeminiAuthConfig`**: Centralized, secure authentication handling for Google Cloud / Gemini API keys and Service Accounts.
 * **`GeminiJobBatcher`**: High-throughput asynchronous batching engine with concurrent queue management.
