@@ -4,10 +4,16 @@ const DEFAULT_CONFIG = {
     model_name: "gemini-omni-flash-preview",
     task: "video_editing",
     duration: 8,
-    aspect_ratio: "16:9",
+    aspect_ratio: "1:1",
     delivery: "base64",
     prefix_text: "",
-    suffix_text: ""
+    suffix_text: "",
+    image_roles: {
+        "Image1": "reference",
+        "Image2": "reference",
+        "Image3": "reference",
+        "Image4": "reference"
+    }
 };
 
 function isNodeOutputtingVideo(node, outputSlot, visited = new Set()) {
@@ -163,30 +169,30 @@ app.registerExtension({
 
                 const taskSel = document.createElement("select");
                 taskSel.innerHTML = `
-                    <option value="text_to_video">text_to_video</option>
-                    <option value="image_to_video">image_to_video</option>
                     <option value="video_editing">video_editing</option>
+                    <option value="image_to_video">image_to_video</option>
+                    <option value="text_to_video">text_to_video</option>
                 `;
-                taskSel.value = config.task;
+                taskSel.value = config.task || "video_editing";
                 taskSel.onchange = (e) => { config.task = e.target.value; saveConfig(config); };
                 topRow.appendChild(createField("task:", taskSel, "1 1 auto").row);
 
                 const durInp = document.createElement("input");
                 durInp.type = "number";
                 durInp.min = "3"; durInp.max = "10"; durInp.step = "1";
-                durInp.value = config.duration;
-                durInp.onchange = (e) => { config.duration = parseInt(e.target.value) || 3; saveConfig(config); };
+                durInp.value = config.duration || 8;
+                durInp.onchange = (e) => { config.duration = parseInt(e.target.value) || 8; saveConfig(config); };
                 durInp.style.width = "25px";
                 const durField = createField("dur(s):", durInp, "0 0 auto");
                 topRow.appendChild(durField.row);
 
                 const arSel = document.createElement("select");
                 arSel.innerHTML = `
-                    <option value="16:9">16:9</option>
                     <option value="1:1">1:1</option>
+                    <option value="16:9">16:9</option>
                     <option value="9:16">9:16</option>
                 `;
-                arSel.value = config.aspect_ratio;
+                arSel.value = config.aspect_ratio || "1:1";
                 arSel.onchange = (e) => { config.aspect_ratio = e.target.value; saveConfig(config); };
                 arSel.style.width = "40px";
                 const arField = createField("AR:", arSel, "0 0 auto");
@@ -197,25 +203,37 @@ app.registerExtension({
                     <option value="base64">base64</option>
                     <option value="uri">uri</option>
                 `;
-                delSel.value = config.delivery;
+                delSel.value = config.delivery || "base64";
                 delSel.onchange = (e) => { config.delivery = e.target.value; saveConfig(config); };
                 delSel.style.width = "50px";
                 topRow.appendChild(createField("del:", delSel, "0 0 auto").row);
 
                 const preInp = document.createElement("input");
                 preInp.type = "text";
-                preInp.value = config.prefix_text;
+                preInp.value = config.prefix_text || "";
                 preInp.oninput = (e) => { config.prefix_text = e.target.value; saveConfig(config); };
                 bottomRow.appendChild(createField("prefix:", preInp, "1 1 50%").row);
 
                 const sufInp = document.createElement("input");
                 sufInp.type = "text";
-                sufInp.value = config.suffix_text;
+                sufInp.value = config.suffix_text || "";
                 sufInp.oninput = (e) => { config.suffix_text = e.target.value; saveConfig(config); };
                 bottomRow.appendChild(createField("suffix:", sufInp, "1 1 50%").row);
                 
                 container.appendChild(topRow);
                 container.appendChild(bottomRow);
+
+                const syncUIFromConfig = () => {
+                    config = parseConfig();
+                    if (!config.task) config.task = "video_editing";
+                    modelSel.value = config.model_name || "gemini-omni-flash-preview";
+                    taskSel.value = config.task || "video_editing";
+                    durInp.value = config.duration != null ? config.duration : 8;
+                    arSel.value = config.aspect_ratio || "1:1";
+                    delSel.value = config.delivery || "base64";
+                    preInp.value = config.prefix_text || "";
+                    sufInp.value = config.suffix_text || "";
+                };
 
                 try {
                     const uiWidget = this.addDOMWidget("omni_params_ui", "HTML", container, { serialize: false, hideOnZoom: false });
@@ -229,6 +247,13 @@ app.registerExtension({
                         this.widgets.splice(previewIdx, 0, uiWidget);
                     }
                 } catch(e) {}
+
+                // Hook configure to synchronize UI elements when loading saved workflow
+                const origOnConfigure = this.onConfigure;
+                this.onConfigure = function() {
+                    if (origOnConfigure) origOnConfigure.apply(this, arguments);
+                    syncUIFromConfig();
+                };
 
                 // Keep controls active and synchronizable
                 durInp.disabled = false;
