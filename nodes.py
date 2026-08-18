@@ -1844,6 +1844,7 @@ class KineticMotionCurveExtractor:
         flow_list = []
         flow_particles = []
         prev_gray = None
+        prev_gray_small = None
 
         final_frames = []
         grid_frames = []
@@ -1919,17 +1920,31 @@ class KineticMotionCurveExtractor:
             self._draw_hud(s2_annotated, "2. MediaPipe Pose Keypoints", "33 3D Joints Tracked")
             stage2_frames.append(s2_annotated)
 
-            # Stage 3: Dense Optical Flow Velocity
+            # Stage 3: Dense Optical Flow Velocity (Multi-Scale Accelerated)
             s3_canvas = np.zeros_like(rgb_frame)
             flow = None
-            if dense_optical_flow == "enable" and prev_gray is not None:
-                flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-                mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-                hsv = np.zeros_like(rgb_frame)
-                hsv[..., 1] = 255
-                hsv[..., 0] = ang * 180 / np.pi / 2
-                hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
-                s3_canvas = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+            if dense_optical_flow == "enable":
+                # Scale down for fast Farneback computation (10x-15x faster on CPU)
+                max_flow_dim = 480
+                flow_scale = min(1.0, max_flow_dim / max(h, w)) if max(h, w) > max_flow_dim else 1.0
+                small_w, small_h = int(w * flow_scale), int(h * flow_scale)
+                gray_small = cv2.resize(gray, (small_w, small_h), interpolation=cv2.INTER_AREA) if flow_scale < 1.0 else gray
+
+                if prev_gray_small is not None:
+                    flow_small = cv2.calcOpticalFlowFarneback(prev_gray_small, gray_small, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+                    if flow_scale < 1.0:
+                        flow = cv2.resize(flow_small, (w, h), interpolation=cv2.INTER_LINEAR) * (1.0 / flow_scale)
+                    else:
+                        flow = flow_small
+
+                    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+                    hsv = np.zeros_like(rgb_frame)
+                    hsv[..., 1] = 255
+                    hsv[..., 0] = ang * 180 / np.pi / 2
+                    hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+                    s3_canvas = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+                prev_gray_small = gray_small
             flow_list.append(flow)
             prev_gray = gray
             s3_annotated = s3_canvas.copy()
@@ -2446,7 +2461,26 @@ class TAPNetKineticPointTracker:
             back_pts, status_bwd, _ = cv2.calcOpticalFlowPyrLK(
                 curr_gray, prev_gray, next_pts, None, **lk_params
             )
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, curr_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            # Get optical flow (reuse from Extractor if available, else compute fast downscaled flow)
+            cached_flow = None
+            if isinstance(mask_or_images, dict) and "flow_list" in mask_or_images:
+                f_list = mask_or_images["flow_list"]
+                if fi - 1 < len(f_list) and f_list[fi - 1] is not None:
+                    cached_flow = f_list[fi - 1]
+
+            if cached_flow is not None:
+                flow = cached_flow
+            else:
+                max_f_dim = 480
+                f_scale = min(1.0, max_f_dim / max(h, w)) if max(h, w) > max_f_dim else 1.0
+                if f_scale < 1.0:
+                    sw, sh = int(w * f_scale), int(h * f_scale)
+                    g_prev_s = cv2.resize(prev_gray, (sw, sh), interpolation=cv2.INTER_AREA)
+                    g_curr_s = cv2.resize(curr_gray, (sw, sh), interpolation=cv2.INTER_AREA)
+                    f_s = cv2.calcOpticalFlowFarneback(g_prev_s, g_curr_s, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+                    flow = cv2.resize(f_s, (w, h), interpolation=cv2.INTER_LINEAR) * (1.0 / f_scale)
+                else:
+                    flow = cv2.calcOpticalFlowFarneback(prev_gray, curr_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
             for i in range(N):
                 pt_prev = current_pts[i, 0]
