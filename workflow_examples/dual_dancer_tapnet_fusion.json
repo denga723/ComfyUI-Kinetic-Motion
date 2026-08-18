@@ -1,0 +1,3677 @@
+{
+  "last_node_id": 200,
+  "last_link_id": 59,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [
+        80,
+        140
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1,
+            2,
+            51
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "balletdance_video.mp4",
+        "video"
+      ],
+      "title": "Source Dual-Dancer Video (White + Black Dancers)"
+    },
+    {
+      "id": 50,
+      "type": "DualPersonKineticMotionExtractor",
+      "pos": [
+        460,
+        140
+      ],
+      "size": [
+        400,
+        480
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video_or_images",
+          "name": "video_or_images",
+          "type": "*",
+          "link": 1
+        },
+        {
+          "localized_name": "luminance_threshold",
+          "name": "luminance_threshold",
+          "type": "INT",
+          "widget": {
+            "name": "luminance_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "char1_kinetic_color",
+          "name": "char1_kinetic_color",
+          "type": "COMBO",
+          "widget": {
+            "name": "char1_kinetic_color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "char2_kinetic_color",
+          "name": "char2_kinetic_color",
+          "type": "COMBO",
+          "widget": {
+            "name": "char2_kinetic_color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "spline_type",
+          "name": "spline_type",
+          "type": "COMBO",
+          "widget": {
+            "name": "spline_type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_window",
+          "name": "trail_window",
+          "type": "INT",
+          "widget": {
+            "name": "trail_window"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "stroke_base_thickness",
+          "name": "stroke_base_thickness",
+          "type": "INT",
+          "widget": {
+            "name": "stroke_base_thickness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "speed_to_width_factor",
+          "name": "speed_to_width_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "speed_to_width_factor"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "dense_optical_flow",
+          "name": "dense_optical_flow",
+          "type": "COMBO",
+          "widget": {
+            "name": "dense_optical_flow"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_smoothing",
+          "name": "temporal_smoothing",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_smoothing"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_resolution",
+          "name": "max_resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "fused_dual_kinetic_canvas",
+          "name": "fused_dual_kinetic_canvas",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "stage_pipeline_grid",
+          "name": "stage_pipeline_grid",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "char1_mask_white",
+          "name": "char1_mask_white",
+          "type": "IMAGE",
+          "links": [
+            3,
+            7,
+            52
+          ]
+        },
+        {
+          "localized_name": "char2_mask_black",
+          "name": "char2_mask_black",
+          "type": "IMAGE",
+          "links": [
+            4,
+            8,
+            53
+          ]
+        },
+        {
+          "localized_name": "char1_kinetic_red",
+          "name": "char1_kinetic_red",
+          "type": "IMAGE",
+          "links": [
+            9,
+            54
+          ]
+        },
+        {
+          "localized_name": "char2_kinetic_green",
+          "name": "char2_kinetic_green",
+          "type": "IMAGE",
+          "links": [
+            11,
+            56
+          ]
+        },
+        {
+          "localized_name": "dense_optical_flow",
+          "name": "dense_optical_flow",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "motion_video_file",
+          "name": "motion_video_file",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "localized_name": "dual_motion_data",
+          "name": "dual_motion_data",
+          "type": "DUAL_KINETIC_MOTION_DATA",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DualPersonKineticMotionExtractor"
+      },
+      "widgets_values": [
+        110,
+        "red",
+        "green",
+        "catmull_rom_spline",
+        20,
+        16,
+        1.8,
+        "enable",
+        0.6,
+        24,
+        "720p (Fastest)"
+      ],
+      "title": "Dual-Person Kinetic Motion Extractor (White + Black Dancers)"
+    },
+    {
+      "id": 70,
+      "type": "DualPersonTAPNetTracker",
+      "pos": [
+        920,
+        140
+      ],
+      "size": [
+        420,
+        480
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video_or_images",
+          "name": "video_or_images",
+          "type": "*",
+          "link": 2
+        },
+        {
+          "localized_name": "char1_mask",
+          "name": "char1_mask",
+          "type": "*",
+          "link": 3
+        },
+        {
+          "localized_name": "char2_mask",
+          "name": "char2_mask",
+          "type": "*",
+          "link": 4
+        },
+        {
+          "localized_name": "char1_tapnet_color",
+          "name": "char1_tapnet_color",
+          "type": "COMBO",
+          "widget": {
+            "name": "char1_tapnet_color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "char2_tapnet_color",
+          "name": "char2_tapnet_color",
+          "type": "COMBO",
+          "widget": {
+            "name": "char2_tapnet_color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_points_per_character",
+          "name": "num_points_per_character",
+          "type": "INT",
+          "widget": {
+            "name": "num_points_per_character"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_window",
+          "name": "trail_window",
+          "type": "INT",
+          "widget": {
+            "name": "trail_window"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "point_radius",
+          "name": "point_radius",
+          "type": "INT",
+          "widget": {
+            "name": "point_radius"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_resolution",
+          "name": "max_resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "dual_tapnet_preview",
+          "name": "dual_tapnet_preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "char1_tapnet_yellow",
+          "name": "char1_tapnet_yellow",
+          "type": "IMAGE",
+          "links": [
+            10,
+            55
+          ]
+        },
+        {
+          "localized_name": "char2_tapnet_blue",
+          "name": "char2_tapnet_blue",
+          "type": "IMAGE",
+          "links": [
+            12,
+            57
+          ]
+        },
+        {
+          "localized_name": "tapnet_video_file",
+          "name": "tapnet_video_file",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "localized_name": "dual_tapnet_point_data",
+          "name": "dual_tapnet_point_data",
+          "type": "DUAL_TAPNET_POINT_DATA",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DualPersonTAPNetTracker"
+      },
+      "widgets_values": [
+        "yellow",
+        "blue",
+        64,
+        16,
+        4,
+        24,
+        "720p (Fastest)"
+      ],
+      "title": "Dual-Person TAPNet Point Tracker (Yellow + Blue Points)"
+    },
+    {
+      "id": 60,
+      "type": "DualPersonBrushFusionRenderer",
+      "pos": [
+        1400,
+        140
+      ],
+      "size": [
+        420,
+        480
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "dual_motion_data",
+          "name": "dual_motion_data",
+          "type": "*",
+          "link": 5
+        },
+        {
+          "localized_name": "dual_tapnet_data",
+          "name": "dual_tapnet_data",
+          "type": "*",
+          "link": 6
+        },
+        {
+          "localized_name": "color_palette_mode",
+          "name": "color_palette_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "color_palette_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "paint_decay",
+          "name": "paint_decay",
+          "type": "FLOAT",
+          "widget": {
+            "name": "paint_decay"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "impasto_strength",
+          "name": "impasto_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "impasto_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "glow_bloom",
+          "name": "glow_bloom",
+          "type": "COMBO",
+          "widget": {
+            "name": "glow_bloom"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "ember_sparks",
+          "name": "ember_sparks",
+          "type": "COMBO",
+          "widget": {
+            "name": "ember_sparks"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "dual_fused_brush_canvas",
+          "name": "dual_fused_brush_canvas",
+          "type": "IMAGE",
+          "links": [
+            13,
+            14,
+            20,
+            26,
+            32,
+            42,
+            49,
+            58
+          ]
+        },
+        {
+          "localized_name": "char1_fused_red_yellow",
+          "name": "char1_fused_red_yellow",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "char2_fused_green_blue",
+          "name": "char2_fused_green_blue",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "fused_video_file",
+          "name": "fused_video_file",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DualPersonBrushFusionRenderer"
+      },
+      "widgets_values": [
+        "specified_palette (Red+Yellow vs Green+Blue)",
+        0.88,
+        1.5,
+        "enable",
+        "enable",
+        24
+      ],
+      "title": "Dual-Person Brush Fusion Renderer (Red/Yellow vs Green/Blue)"
+    },
+    {
+      "id": 51,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1920,
+        120
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Char1_Mask_White"
+      ],
+      "title": "Char 1 Mask (White Dancer)"
+    },
+    {
+      "id": 52,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2240,
+        120
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Char2_Mask_Black"
+      ],
+      "title": "Char 2 Mask (Black Dancer)"
+    },
+    {
+      "id": 53,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2560,
+        120
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 53,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Char1_Kinetic_Red"
+      ],
+      "title": "Char 1 Kinetic Curves (RED)"
+    },
+    {
+      "id": 54,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2880,
+        120
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 54,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Char1_TAPNet_Yellow"
+      ],
+      "title": "Char 1 TAPNet Points (YELLOW)"
+    },
+    {
+      "id": 55,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        3200,
+        120
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 55,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Char2_Kinetic_Green"
+      ],
+      "title": "Char 2 Kinetic Curves (GREEN)"
+    },
+    {
+      "id": 56,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1920,
+        490
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 56,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 12
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        false,
+        "Char2_TAPNet_Blue"
+      ],
+      "title": "Char 2 TAPNet Points (BLUE)"
+    },
+    {
+      "id": 61,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2240,
+        490
+      ],
+      "size": [
+        440,
+        330
+      ],
+      "flags": {},
+      "order": 61,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 13
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "DualFuser_MasterVideo"
+      ],
+      "title": "Master Dual Fused Dynamic Brushstrokes Video"
+    },
+    {
+      "id": 101,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        1040
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 101,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 14
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            15,
+            16
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        24,
+        1
+      ],
+      "title": "Extract Dual Screenshot 1 (10% Timepoint (Frame 24))"
+    },
+    {
+      "id": 151,
+      "type": "PreviewImage",
+      "pos": [
+        400,
+        1040
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 151,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Dual Screenshot 1 Preview (10% Timepoint (Frame 24))"
+    },
+    {
+      "id": 111,
+      "type": "LoadImage",
+      "pos": [
+        720,
+        1040
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 111,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            17
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_1.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 1 (Texture/Impasto)"
+    },
+    {
+      "id": 121,
+      "type": "ImageBatch",
+      "pos": [
+        1040,
+        1140
+      ],
+      "size": [
+        220,
+        140
+      ],
+      "flags": {},
+      "order": 121,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 16
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 1 (Dual Structure + Style)"
+    },
+    {
+      "id": 131,
+      "type": "GeminiImageNode",
+      "pos": [
+        1300,
+        1040
+      ],
+      "size": [
+        440,
+        360
+      ],
+      "flags": {},
+      "order": 131,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 18
+        },
+        {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            19,
+            38
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "STRICT STRUCTURAL PRESERVATION DIRECTIVE: Image 1 (Screenshot 1) is the absolute geometric blueprint and structural ground truth containing two interacting dancers. Image 2 is strictly a physical paint texture and surface material swatch. Character 1 features vibrant RED kinetic motion curves and glowing YELLOW particle trails. Character 2 features vibrant GREEN kinetic motion curves and luminous BLUE particle trails. You MUST preserve 100% of the exact dual-dancer structure, contours, curves, stroke coordinates, trajectory positions, and spatial layout of Image 1 without ANY alteration, addition, deletion, or shifting. DO NOT import, paint, or hallucinate any subjects, figures, faces, objects, flowers, or scene elements from Image 2. Only transfer the physical oil paint materiality from Image 2 onto the existing strokes of Image 1: coat every line and stroke from Image 1 with heavy 3D impasto paint ridges, sharp palette knife bevels, tactile wet pigment striations, and raking specular highlights, strictly maintaining the exact dark background and stroke placement from Image 1.",
+        "gemini-2.5-flash-image",
+        43,
+        "randomize",
+        "auto",
+        "IMAGE",
+        "You are a strict structural-preserving fine-art oil paint rendering engine for dual-dancer kinetic motion. When two images are provided: IMAGE 1 IS THE UNALTERABLE GEOMETRIC BLUEPRINT. You must rigidly follow every single contour, stroke trajectory, line placement, and dual-character composition layout from Image 1 with ZERO structural changes, zero drift, and zero added or removed shapes. Character 1 is rendered in rich Red impasto with Yellow filaments. Character 2 is rendered in rich Green impasto with Blue filaments. IMAGE 2 IS ONLY A PHYSICAL MATERIAL/TEXTURE REFERENCE. Never transfer the subject matter, faces, objects, or scene layout of Image 2. Your sole task is to render the exact strokes from Image 1 with rich physical 3D oil paint texture, sharp palette-knife impasto ridges, tactile bristle marks, and specular highlights."
+      ],
+      "title": "Nano Banana Stylizer 1 (Keyframe 1 Stylization)"
+    },
+    {
+      "id": 141,
+      "type": "PreviewImage",
+      "pos": [
+        1780,
+        1040
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 141,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 19
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 1 Preview"
+    },
+    {
+      "id": 102,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        1480
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 102,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 20
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            21,
+            22
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        72,
+        1
+      ],
+      "title": "Extract Dual Screenshot 2 (35% Timepoint (Frame 72))"
+    },
+    {
+      "id": 152,
+      "type": "PreviewImage",
+      "pos": [
+        400,
+        1480
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 152,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 21
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Dual Screenshot 2 Preview (35% Timepoint (Frame 72))"
+    },
+    {
+      "id": 112,
+      "type": "LoadImage",
+      "pos": [
+        720,
+        1480
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 112,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_2.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 2 (Texture/Impasto)"
+    },
+    {
+      "id": 122,
+      "type": "ImageBatch",
+      "pos": [
+        1040,
+        1580
+      ],
+      "size": [
+        220,
+        140
+      ],
+      "flags": {},
+      "order": 122,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 22
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 2 (Dual Structure + Style)"
+    },
+    {
+      "id": 132,
+      "type": "GeminiImageNode",
+      "pos": [
+        1300,
+        1480
+      ],
+      "size": [
+        440,
+        360
+      ],
+      "flags": {},
+      "order": 132,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 24
+        },
+        {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            25,
+            39
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "STRICT STRUCTURAL PRESERVATION DIRECTIVE: Image 1 (Screenshot 2) is the absolute geometric blueprint and structural ground truth containing two interacting dancers. Image 2 is strictly a physical paint texture and surface material swatch. Character 1 features vibrant RED kinetic motion curves and glowing YELLOW particle trails. Character 2 features vibrant GREEN kinetic motion curves and luminous BLUE particle trails. You MUST preserve 100% of the exact dual-dancer structure, contours, curves, stroke coordinates, trajectory positions, and spatial layout of Image 1 without ANY alteration, addition, deletion, or shifting. DO NOT import, paint, or hallucinate any subjects, figures, faces, objects, flowers, or scene elements from Image 2. Only transfer the physical oil paint materiality from Image 2 onto the existing strokes of Image 1: coat every line and stroke from Image 1 with heavy 3D impasto paint ridges, sharp palette knife bevels, tactile wet pigment striations, and raking specular highlights, strictly maintaining the exact dark background and stroke placement from Image 1.",
+        "gemini-2.5-flash-image",
+        44,
+        "randomize",
+        "auto",
+        "IMAGE",
+        "You are a strict structural-preserving fine-art oil paint rendering engine for dual-dancer kinetic motion. When two images are provided: IMAGE 1 IS THE UNALTERABLE GEOMETRIC BLUEPRINT. You must rigidly follow every single contour, stroke trajectory, line placement, and dual-character composition layout from Image 1 with ZERO structural changes, zero drift, and zero added or removed shapes. Character 1 is rendered in rich Red impasto with Yellow filaments. Character 2 is rendered in rich Green impasto with Blue filaments. IMAGE 2 IS ONLY A PHYSICAL MATERIAL/TEXTURE REFERENCE. Never transfer the subject matter, faces, objects, or scene layout of Image 2. Your sole task is to render the exact strokes from Image 1 with rich physical 3D oil paint texture, sharp palette-knife impasto ridges, tactile bristle marks, and specular highlights."
+      ],
+      "title": "Nano Banana Stylizer 2 (Keyframe 2 Stylization)"
+    },
+    {
+      "id": 142,
+      "type": "PreviewImage",
+      "pos": [
+        1780,
+        1480
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 142,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 25
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 2 Preview"
+    },
+    {
+      "id": 103,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        1920
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 103,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 26
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            27,
+            28
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        120,
+        1
+      ],
+      "title": "Extract Dual Screenshot 3 (60% Timepoint (Frame 120))"
+    },
+    {
+      "id": 153,
+      "type": "PreviewImage",
+      "pos": [
+        400,
+        1920
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 153,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Dual Screenshot 3 Preview (60% Timepoint (Frame 120))"
+    },
+    {
+      "id": 113,
+      "type": "LoadImage",
+      "pos": [
+        720,
+        1920
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 113,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_3.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 3 (Texture/Impasto)"
+    },
+    {
+      "id": 123,
+      "type": "ImageBatch",
+      "pos": [
+        1040,
+        2020
+      ],
+      "size": [
+        220,
+        140
+      ],
+      "flags": {},
+      "order": 123,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 28
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 29
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            30
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 3 (Dual Structure + Style)"
+    },
+    {
+      "id": 133,
+      "type": "GeminiImageNode",
+      "pos": [
+        1300,
+        1920
+      ],
+      "size": [
+        440,
+        360
+      ],
+      "flags": {},
+      "order": 133,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 30
+        },
+        {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            31,
+            40
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "STRICT STRUCTURAL PRESERVATION DIRECTIVE: Image 1 (Screenshot 3) is the absolute geometric blueprint and structural ground truth containing two interacting dancers. Image 2 is strictly a physical paint texture and surface material swatch. Character 1 features vibrant RED kinetic motion curves and glowing YELLOW particle trails. Character 2 features vibrant GREEN kinetic motion curves and luminous BLUE particle trails. You MUST preserve 100% of the exact dual-dancer structure, contours, curves, stroke coordinates, trajectory positions, and spatial layout of Image 1 without ANY alteration, addition, deletion, or shifting. DO NOT import, paint, or hallucinate any subjects, figures, faces, objects, flowers, or scene elements from Image 2. Only transfer the physical oil paint materiality from Image 2 onto the existing strokes of Image 1: coat every line and stroke from Image 1 with heavy 3D impasto paint ridges, sharp palette knife bevels, tactile wet pigment striations, and raking specular highlights, strictly maintaining the exact dark background and stroke placement from Image 1.",
+        "gemini-2.5-flash-image",
+        45,
+        "randomize",
+        "auto",
+        "IMAGE",
+        "You are a strict structural-preserving fine-art oil paint rendering engine for dual-dancer kinetic motion. When two images are provided: IMAGE 1 IS THE UNALTERABLE GEOMETRIC BLUEPRINT. You must rigidly follow every single contour, stroke trajectory, line placement, and dual-character composition layout from Image 1 with ZERO structural changes, zero drift, and zero added or removed shapes. Character 1 is rendered in rich Red impasto with Yellow filaments. Character 2 is rendered in rich Green impasto with Blue filaments. IMAGE 2 IS ONLY A PHYSICAL MATERIAL/TEXTURE REFERENCE. Never transfer the subject matter, faces, objects, or scene layout of Image 2. Your sole task is to render the exact strokes from Image 1 with rich physical 3D oil paint texture, sharp palette-knife impasto ridges, tactile bristle marks, and specular highlights."
+      ],
+      "title": "Nano Banana Stylizer 3 (Keyframe 3 Stylization)"
+    },
+    {
+      "id": 143,
+      "type": "PreviewImage",
+      "pos": [
+        1780,
+        1920
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 143,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 31
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 3 Preview"
+    },
+    {
+      "id": 104,
+      "type": "GetImageRangeFromBatch",
+      "pos": [
+        80,
+        2360
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 104,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "localized_name": "masks",
+          "name": "masks",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "start_index",
+          "name": "start_index",
+          "type": "INT",
+          "widget": {
+            "name": "start_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_frames",
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            33,
+            34
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageRangeFromBatch"
+      },
+      "widgets_values": [
+        168,
+        1
+      ],
+      "title": "Extract Dual Screenshot 4 (85% Timepoint (Frame 168))"
+    },
+    {
+      "id": 154,
+      "type": "PreviewImage",
+      "pos": [
+        400,
+        2360
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 154,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 33
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Dual Screenshot 4 Preview (85% Timepoint (Frame 168))"
+    },
+    {
+      "id": 114,
+      "type": "LoadImage",
+      "pos": [
+        720,
+        2360
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 114,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            35
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oil_style_texture_4.png",
+        "image"
+      ],
+      "title": "Oil Painting Style Reference 4 (Texture/Impasto)"
+    },
+    {
+      "id": 124,
+      "type": "ImageBatch",
+      "pos": [
+        1040,
+        2460
+      ],
+      "size": [
+        220,
+        140
+      ],
+      "flags": {},
+      "order": 124,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image1",
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 34
+        },
+        {
+          "localized_name": "image2",
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 35
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            36
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatch"
+      },
+      "widgets_values": [],
+      "title": "Context Batch 4 (Dual Structure + Style)"
+    },
+    {
+      "id": 134,
+      "type": "GeminiImageNode",
+      "pos": [
+        1300,
+        2360
+      ],
+      "size": [
+        440,
+        360
+      ],
+      "flags": {},
+      "order": 134,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 36
+        },
+        {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "response_modalities",
+          "name": "response_modalities",
+          "type": "COMBO",
+          "widget": {
+            "name": "response_modalities"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            37,
+            41
+          ]
+        },
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImageNode"
+      },
+      "widgets_values": [
+        "STRICT STRUCTURAL PRESERVATION DIRECTIVE: Image 1 (Screenshot 4) is the absolute geometric blueprint and structural ground truth containing two interacting dancers. Image 2 is strictly a physical paint texture and surface material swatch. Character 1 features vibrant RED kinetic motion curves and glowing YELLOW particle trails. Character 2 features vibrant GREEN kinetic motion curves and luminous BLUE particle trails. You MUST preserve 100% of the exact dual-dancer structure, contours, curves, stroke coordinates, trajectory positions, and spatial layout of Image 1 without ANY alteration, addition, deletion, or shifting. DO NOT import, paint, or hallucinate any subjects, figures, faces, objects, flowers, or scene elements from Image 2. Only transfer the physical oil paint materiality from Image 2 onto the existing strokes of Image 1: coat every line and stroke from Image 1 with heavy 3D impasto paint ridges, sharp palette knife bevels, tactile wet pigment striations, and raking specular highlights, strictly maintaining the exact dark background and stroke placement from Image 1.",
+        "gemini-2.5-flash-image",
+        46,
+        "randomize",
+        "auto",
+        "IMAGE",
+        "You are a strict structural-preserving fine-art oil paint rendering engine for dual-dancer kinetic motion. When two images are provided: IMAGE 1 IS THE UNALTERABLE GEOMETRIC BLUEPRINT. You must rigidly follow every single contour, stroke trajectory, line placement, and dual-character composition layout from Image 1 with ZERO structural changes, zero drift, and zero added or removed shapes. Character 1 is rendered in rich Red impasto with Yellow filaments. Character 2 is rendered in rich Green impasto with Blue filaments. IMAGE 2 IS ONLY A PHYSICAL MATERIAL/TEXTURE REFERENCE. Never transfer the subject matter, faces, objects, or scene layout of Image 2. Your sole task is to render the exact strokes from Image 1 with rich physical 3D oil paint texture, sharp palette-knife impasto ridges, tactile bristle marks, and specular highlights."
+      ],
+      "title": "Nano Banana Stylizer 4 (Keyframe 4 Stylization)"
+    },
+    {
+      "id": 144,
+      "type": "PreviewImage",
+      "pos": [
+        1780,
+        2360
+      ],
+      "size": [
+        280,
+        360
+      ],
+      "flags": {},
+      "order": 144,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 37
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Nano Banana Stylized Keyframe 4 Preview"
+    },
+    {
+      "id": 4,
+      "type": "ImageBatchMulti",
+      "pos": [
+        2180,
+        1040
+      ],
+      "size": [
+        280,
+        240
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image_1",
+          "name": "image_1",
+          "type": "IMAGE",
+          "link": 38
+        },
+        {
+          "localized_name": "image_2",
+          "name": "image_2",
+          "type": "IMAGE",
+          "link": 39
+        },
+        {
+          "localized_name": "image_3",
+          "name": "image_3",
+          "type": "IMAGE",
+          "link": 40
+        },
+        {
+          "localized_name": "image_4",
+          "name": "image_4",
+          "type": "IMAGE",
+          "link": 41
+        },
+        {
+          "localized_name": "inputcount",
+          "name": "inputcount",
+          "type": "INT",
+          "widget": {
+            "name": "inputcount"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatchMulti"
+      },
+      "widgets_values": [
+        4
+      ],
+      "title": "4 Nano Banana Stylized References (Image1..Image4)"
+    },
+    {
+      "id": 5,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        2180,
+        1340
+      ],
+      "size": [
+        280,
+        220
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "string",
+          "name": "string",
+          "type": "STRING",
+          "links": [
+            44
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "Perform dual-character video style transfer on Video1 using the oil painting texture, impasto brush marks, and color palette from Image1, Image2, Image3, and Image4. Character 1 is rendered in vibrant Red kinetic strokes with glowing Yellow particle filaments. Character 2 is rendered in vibrant Green kinetic strokes with luminous Blue particle filaments. Strictly preserve the exact motion paths, trajectories, curves, velocity, and timing of both moving dancers from Video1 without altering their structure or animation layout."
+      ],
+      "title": "Dual-Dancer Motion Stylization Prompt"
+    },
+    {
+      "id": 6,
+      "type": "GeminiJobBatcher",
+      "pos": [
+        2520,
+        1040
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image_stream_1",
+          "name": "image_stream_1",
+          "type": "*",
+          "link": 42
+        },
+        {
+          "localized_name": "image_stream_2",
+          "name": "image_stream_2",
+          "type": "*",
+          "link": 43
+        },
+        {
+          "localized_name": "text_stream_3",
+          "name": "text_stream_3",
+          "type": "STRING",
+          "widget": {
+            "name": "text_stream_3"
+          },
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "job_batch",
+          "name": "job_batch",
+          "type": "GEMINI_JOB_BATCH",
+          "links": [
+            46
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiJobBatcher"
+      },
+      "widgets_values": [
+        1,
+        "[{\"id\": 1, \"type\": \"IMAGE\", \"prefix\": \"\", \"delim\": \"\\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 1, \"cycle\": \"increment\", \"roles\": [\"reference\"]}, {\"id\": 2, \"type\": \"IMAGE\", \"prefix\": \"\", \"delim\": \"\\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 4, \"cycle\": \"increment\", \"roles\": [\"reference\", \"reference\", \"reference\", \"reference\"]}, {\"id\": 3, \"type\": \"STRING\", \"prefix\": \"\", \"delim\": \"\\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 1, \"cycle\": \"increment\", \"roles\": [\"user\"]}]",
+        3,
+        false,
+        ""
+      ],
+      "title": "Gemini Job Batcher (Dual Fuser Video + 4 Nano Banana Images + Prompt)"
+    },
+    {
+      "id": 7,
+      "type": "GeminiAuthConfig",
+      "pos": [
+        2520,
+        1400
+      ],
+      "size": [
+        300,
+        160
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "auth_config",
+          "name": "auth_config",
+          "type": "GEMINI_AUTH_CONFIG",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiAuthConfig"
+      },
+      "widgets_values": [
+        "",
+        ""
+      ],
+      "title": "Gemini Auth Config"
+    },
+    {
+      "id": 8,
+      "type": "GeminiOmniModel",
+      "pos": [
+        2880,
+        1040
+      ],
+      "size": [
+        340,
+        380
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "auth_config",
+          "name": "auth_config",
+          "type": "GEMINI_AUTH_CONFIG",
+          "link": 45
+        },
+        {
+          "localized_name": "job_batch",
+          "name": "job_batch",
+          "type": "GEMINI_JOB_BATCH",
+          "link": 46
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "task",
+          "name": "task",
+          "type": "COMBO",
+          "widget": {
+            "name": "task"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "duration_seconds",
+          "name": "duration_seconds",
+          "type": "COMBO",
+          "widget": {
+            "name": "duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "person_generation",
+          "name": "person_generation",
+          "type": "COMBO",
+          "widget": {
+            "name": "person_generation"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "preview",
+          "name": "preview",
+          "type": "GEMINI_MULTIMODAL_PREVIEW",
+          "links": [
+            47
+          ]
+        },
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            48,
+            50,
+            59
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiOmniModel"
+      },
+      "widgets_values": [
+        "veo-2.0-generate-001",
+        "video_editing",
+        "16:9",
+        "5",
+        "allow_adult"
+      ],
+      "title": "Gemini Omni Model (Dual-Dancer Video-to-Art Stylization)"
+    },
+    {
+      "id": 9,
+      "type": "GeminiMultimodalPreview",
+      "pos": [
+        3260,
+        1040
+      ],
+      "size": [
+        280,
+        240
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "preview_data",
+          "name": "preview_data",
+          "type": "GEMINI_MULTIMODAL_PREVIEW",
+          "link": 47
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "GeminiMultimodalPreview"
+      },
+      "widgets_values": [],
+      "title": "Gemini Multimodal Live Inspector"
+    },
+    {
+      "id": 10,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        3580,
+        1040
+      ],
+      "size": [
+        320,
+        340
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 48
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "Dual_Dancer_Gemini_Omni_Final_Art"
+      ],
+      "title": "Final Stylized Dual-Dancer Artwork Video (Gemini Omni Output)"
+    },
+    {
+      "id": 80,
+      "type": "KineticDualComparisonViewer",
+      "pos": [
+        3580,
+        1420
+      ],
+      "size": [
+        520,
+        420
+      ],
+      "flags": {},
+      "order": 80,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "stage6_fused_brushstrokes",
+          "name": "stage6_fused_brushstrokes",
+          "type": "*",
+          "link": 49
+        },
+        {
+          "localized_name": "final_stylized_artwork",
+          "name": "final_stylized_artwork",
+          "type": "*",
+          "link": 50
+        },
+        {
+          "localized_name": "layout",
+          "name": "layout",
+          "type": "COMBO",
+          "widget": {
+            "name": "layout"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "show_labels",
+          "name": "show_labels",
+          "type": "COMBO",
+          "widget": {
+            "name": "show_labels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "label_left",
+          "name": "label_left",
+          "type": "STRING",
+          "widget": {
+            "name": "label_left"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "label_right",
+          "name": "label_right",
+          "type": "STRING",
+          "widget": {
+            "name": "label_right"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "comparison_video",
+          "name": "comparison_video",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KineticDualComparisonViewer"
+      },
+      "widgets_values": [
+        "side_by_side_horizontal",
+        "enable",
+        "Master Dual Fused Strokes",
+        "Gemini Omni Final Art",
+        24,
+        "mp4",
+        true,
+        "Dual_Dancer_Comparison"
+      ],
+      "title": "Dual Comparison Viewer (Master Dual Fuser vs Gemini Omni Artwork)"
+    },
+    {
+      "id": 200,
+      "type": "DualPersonStagePipelineViewer",
+      "pos": [
+        3620,
+        1880
+      ],
+      "size": [
+        540,
+        580
+      ],
+      "flags": {},
+      "order": 200,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "original_video",
+          "name": "original_video",
+          "type": "*",
+          "link": 51
+        },
+        {
+          "localized_name": "char1_mask_white",
+          "name": "char1_mask_white",
+          "type": "*",
+          "link": 52
+        },
+        {
+          "localized_name": "char2_mask_black",
+          "name": "char2_mask_black",
+          "type": "*",
+          "link": 53
+        },
+        {
+          "localized_name": "char1_kinetic_red",
+          "name": "char1_kinetic_red",
+          "type": "*",
+          "link": 54
+        },
+        {
+          "localized_name": "char1_tapnet_yellow",
+          "name": "char1_tapnet_yellow",
+          "type": "*",
+          "link": 55
+        },
+        {
+          "localized_name": "char2_kinetic_green",
+          "name": "char2_kinetic_green",
+          "type": "*",
+          "link": 56
+        },
+        {
+          "localized_name": "char2_tapnet_blue",
+          "name": "char2_tapnet_blue",
+          "type": "*",
+          "link": 57
+        },
+        {
+          "localized_name": "dual_fuser_master",
+          "name": "dual_fuser_master",
+          "type": "*",
+          "link": 58
+        },
+        {
+          "localized_name": "gemini_omni_artwork",
+          "name": "gemini_omni_artwork",
+          "type": "*",
+          "link": 59
+        },
+        {
+          "localized_name": "layout",
+          "name": "layout",
+          "type": "COMBO",
+          "widget": {
+            "name": "layout"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "show_hud_labels",
+          "name": "show_hud_labels",
+          "type": "COMBO",
+          "widget": {
+            "name": "show_hud_labels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "dual_pipeline_preview",
+          "name": "dual_pipeline_preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DualPersonStagePipelineViewer"
+      },
+      "widgets_values": [
+        "grid_3x3",
+        "enable",
+        24,
+        "mp4",
+        true,
+        "Dual_Dancer_9Stage_Pipeline"
+      ],
+      "title": "Dual-Person 9-Stage Pipeline Viewer (All Maps Synchronizer)"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      50,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      1,
+      0,
+      70,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      50,
+      2,
+      70,
+      1,
+      "IMAGE"
+    ],
+    [
+      4,
+      50,
+      3,
+      70,
+      2,
+      "IMAGE"
+    ],
+    [
+      5,
+      50,
+      8,
+      60,
+      0,
+      "DUAL_KINETIC_MOTION_DATA"
+    ],
+    [
+      6,
+      70,
+      4,
+      60,
+      1,
+      "DUAL_TAPNET_POINT_DATA"
+    ],
+    [
+      7,
+      50,
+      2,
+      51,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      50,
+      3,
+      52,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      50,
+      4,
+      53,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      70,
+      1,
+      54,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      50,
+      5,
+      55,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      70,
+      2,
+      56,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      60,
+      0,
+      61,
+      0,
+      "IMAGE"
+    ],
+    [
+      14,
+      60,
+      0,
+      101,
+      0,
+      "IMAGE"
+    ],
+    [
+      15,
+      101,
+      0,
+      151,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      101,
+      0,
+      121,
+      0,
+      "IMAGE"
+    ],
+    [
+      17,
+      111,
+      0,
+      121,
+      1,
+      "IMAGE"
+    ],
+    [
+      18,
+      121,
+      0,
+      131,
+      0,
+      "IMAGE"
+    ],
+    [
+      19,
+      131,
+      0,
+      141,
+      0,
+      "IMAGE"
+    ],
+    [
+      20,
+      60,
+      0,
+      102,
+      0,
+      "IMAGE"
+    ],
+    [
+      21,
+      102,
+      0,
+      152,
+      0,
+      "IMAGE"
+    ],
+    [
+      22,
+      102,
+      0,
+      122,
+      0,
+      "IMAGE"
+    ],
+    [
+      23,
+      112,
+      0,
+      122,
+      1,
+      "IMAGE"
+    ],
+    [
+      24,
+      122,
+      0,
+      132,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      132,
+      0,
+      142,
+      0,
+      "IMAGE"
+    ],
+    [
+      26,
+      60,
+      0,
+      103,
+      0,
+      "IMAGE"
+    ],
+    [
+      27,
+      103,
+      0,
+      153,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      103,
+      0,
+      123,
+      0,
+      "IMAGE"
+    ],
+    [
+      29,
+      113,
+      0,
+      123,
+      1,
+      "IMAGE"
+    ],
+    [
+      30,
+      123,
+      0,
+      133,
+      0,
+      "IMAGE"
+    ],
+    [
+      31,
+      133,
+      0,
+      143,
+      0,
+      "IMAGE"
+    ],
+    [
+      32,
+      60,
+      0,
+      104,
+      0,
+      "IMAGE"
+    ],
+    [
+      33,
+      104,
+      0,
+      154,
+      0,
+      "IMAGE"
+    ],
+    [
+      34,
+      104,
+      0,
+      124,
+      0,
+      "IMAGE"
+    ],
+    [
+      35,
+      114,
+      0,
+      124,
+      1,
+      "IMAGE"
+    ],
+    [
+      36,
+      124,
+      0,
+      134,
+      0,
+      "IMAGE"
+    ],
+    [
+      37,
+      134,
+      0,
+      144,
+      0,
+      "IMAGE"
+    ],
+    [
+      38,
+      131,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      39,
+      132,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      40,
+      133,
+      0,
+      4,
+      2,
+      "IMAGE"
+    ],
+    [
+      41,
+      134,
+      0,
+      4,
+      3,
+      "IMAGE"
+    ],
+    [
+      42,
+      60,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      43,
+      4,
+      0,
+      6,
+      1,
+      "IMAGE"
+    ],
+    [
+      44,
+      5,
+      0,
+      6,
+      2,
+      "STRING"
+    ],
+    [
+      45,
+      7,
+      0,
+      8,
+      0,
+      "GEMINI_AUTH_CONFIG"
+    ],
+    [
+      46,
+      6,
+      0,
+      8,
+      1,
+      "GEMINI_JOB_BATCH"
+    ],
+    [
+      47,
+      8,
+      0,
+      9,
+      0,
+      "GEMINI_MULTIMODAL_PREVIEW"
+    ],
+    [
+      48,
+      8,
+      1,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      49,
+      60,
+      0,
+      80,
+      0,
+      "IMAGE"
+    ],
+    [
+      50,
+      8,
+      1,
+      80,
+      1,
+      "IMAGE"
+    ],
+    [
+      51,
+      1,
+      0,
+      200,
+      0,
+      "IMAGE"
+    ],
+    [
+      52,
+      50,
+      2,
+      200,
+      1,
+      "IMAGE"
+    ],
+    [
+      53,
+      50,
+      3,
+      200,
+      2,
+      "IMAGE"
+    ],
+    [
+      54,
+      50,
+      4,
+      200,
+      3,
+      "IMAGE"
+    ],
+    [
+      55,
+      70,
+      1,
+      200,
+      4,
+      "IMAGE"
+    ],
+    [
+      56,
+      50,
+      5,
+      200,
+      5,
+      "IMAGE"
+    ],
+    [
+      57,
+      70,
+      2,
+      200,
+      6,
+      "IMAGE"
+    ],
+    [
+      58,
+      60,
+      0,
+      200,
+      7,
+      "IMAGE"
+    ],
+    [
+      59,
+      8,
+      1,
+      200,
+      8,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "1. Video Input & Dual-Person Kinetic Extraction (Red & Green Kinematics)",
+      "bounding": [
+        60,
+        60,
+        820,
+        580
+      ],
+      "color": "#2a363b",
+      "font_size": 24
+    },
+    {
+      "title": "2. Dual-Person TAPNet Lagrangian Point Tracking (Yellow & Blue Points)",
+      "bounding": [
+        900,
+        60,
+        460,
+        580
+      ],
+      "color": "#1b3b36",
+      "font_size": 24
+    },
+    {
+      "title": "3. Dual-Person Dynamic Brush Fusion (Red/Yellow vs Green/Blue Fusion)",
+      "bounding": [
+        1380,
+        60,
+        460,
+        580
+      ],
+      "color": "#3b2a3a",
+      "font_size": 24
+    },
+    {
+      "title": "4. Intermediate Individual Map Previews (Char 1 & Char 2 Maps)",
+      "bounding": [
+        1880,
+        60,
+        1640,
+        780
+      ],
+      "color": "#1e2836",
+      "font_size": 24
+    },
+    {
+      "title": "5. Keyframe Screenshots & Nano Banana Stylizers (Impasto Style Anchors)",
+      "bounding": [
+        60,
+        960,
+        2040,
+        1800
+      ],
+      "color": "#3a3020",
+      "font_size": 28
+    },
+    {
+      "title": "6. Multimodal Batching & Gemini Omni Dual-Dancer Stylization",
+      "bounding": [
+        2140,
+        960,
+        1800,
+        640
+      ],
+      "color": "#2a1b38",
+      "font_size": 28
+    },
+    {
+      "title": "7. Dual-Dancer Synchronized Previews (Side-by-Side & 9-Stage HUD Viewer)",
+      "bounding": [
+        3540,
+        1340,
+        660,
+        1140
+      ],
+      "color": "#162b32",
+      "font_size": 28
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.65,
+      "offset": [
+        -20,
+        -20
+      ]
+    }
+  },
+  "version": 0.4
+}

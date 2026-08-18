@@ -3410,6 +3410,800 @@ class KineticEightStagePipelineViewer:
 KineticSevenStagePipelineViewer = KineticEightStagePipelineViewer
 
 
+class DualPersonKineticMotionExtractor:
+    """
+    Dual-Person Kinetic Motion & Silhouette Extractor.
+    Separates Character 1 (White Dancer) and Character 2 (Black Dancer)
+    via luminance & active contour segmentation, extracting optical flow,
+    and generating Catmull-Rom/Bézier motion curves in designated colors:
+      - Character 1: Vibrant RED (#FF2A4D)
+      - Character 2: Vibrant GREEN (#00FF7F)
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE,),
+            },
+            "optional": {
+                "luminance_threshold": ("INT", {"default": 110, "min": 30, "max": 220, "step": 1, "tooltip": "Luminance threshold separating Person 1 (White Dancer) from Person 2 (Black Dancer)"}),
+                "char1_kinetic_color": (["red", "gold", "cyan", "white"], {"default": "red"}),
+                "char2_kinetic_color": (["green", "blue", "magenta", "white"], {"default": "green"}),
+                "spline_type": (["catmull_rom_spline", "bezier_spline", "linear"], {"default": "catmull_rom_spline"}),
+                "trail_window": ("INT", {"default": 20, "min": 2, "max": 60, "step": 1}),
+                "stroke_base_thickness": ("INT", {"default": 16, "min": 2, "max": 50, "step": 1}),
+                "speed_to_width_factor": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 5.0, "step": 0.1}),
+                "dense_optical_flow": (["enable", "disable"], {"default": "enable"}),
+                "temporal_smoothing": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "DUAL_KINETIC_MOTION_DATA")
+    RETURN_NAMES = (
+        "fused_dual_kinetic_canvas",
+        "stage_pipeline_grid",
+        "char1_mask_white",
+        "char2_mask_black",
+        "char1_kinetic_red",
+        "char2_kinetic_green",
+        "dense_optical_flow",
+        "motion_video_file",
+        "dual_motion_data"
+    )
+    FUNCTION = "extract_dual_motion"
+    CATEGORY = "kinetic_motion"
+
+    def _catmull_rom(self, pts, num_samples=8):
+        if len(pts) < 2: return pts
+        if len(pts) == 2: return pts
+        pts = [pts[0]] + list(pts) + [pts[-1]]
+        curve = []
+        for i in range(len(pts) - 3):
+            p0, p1, p2, p3 = np.array(pts[i], dtype=float), np.array(pts[i+1], dtype=float), np.array(pts[i+2], dtype=float), np.array(pts[i+3], dtype=float)
+            for t in np.linspace(0, 1, num_samples, endpoint=False):
+                t2 = t * t
+                t3 = t2 * t
+                pt = 0.5 * ((2*p1) + (-p0 + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t2 + (-p0 + 3*p1 - 3*p2 + p3)*t3)
+                curve.append((int(round(pt[0])), int(round(pt[1]))))
+        curve.append(pts[-2])
+        return curve
+
+    def extract_dual_motion(self, video_or_images, luminance_threshold=110, char1_kinetic_color="red", char2_kinetic_color="green", spline_type="catmull_rom_spline", trail_window=20, stroke_base_thickness=16, speed_to_width_factor=1.8, dense_optical_flow="enable", temporal_smoothing=0.6, fps=24, max_resolution="720p (Fastest)"):
+        # Color mapping
+        c_map = {
+            "red": (255, 42, 77),
+            "green": (0, 255, 127),
+            "gold": (255, 215, 0),
+            "blue": (0, 136, 255),
+            "cyan": (0, 240, 255),
+            "magenta": (255, 60, 180),
+            "white": (245, 245, 255)
+        }
+        c1_rgb = c_map.get(char1_kinetic_color, (255, 42, 77))
+        c2_rgb = c_map.get(char2_kinetic_color, (0, 255, 127))
+
+        frames_rgb = []
+        v_path = get_video_file_path(video_or_images)
+        if v_path and os.path.exists(v_path):
+            cap = cv2.VideoCapture(v_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames_rgb.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+        elif isinstance(video_or_images, torch.Tensor):
+            t = video_or_images
+            if len(t.shape) == 3: t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            frames_rgb = [np_frames[i] for i in range(np_frames.shape[0])]
+        elif isinstance(video_or_images, list):
+            frames_rgb = video_or_images
+
+        if not frames_rgb:
+            raise ValueError("[DualPersonKineticMotionExtractor] No valid video frames found.")
+
+        # Resolution scaling
+        h_orig, w_orig = frames_rgb[0].shape[:2]
+        res_limits = {"540p (Draft)": 540, "720p (Fastest)": 720, "1080p (Standard)": 1080, "Original (No Limit)": 99999}
+        max_h = res_limits.get(max_resolution, 720)
+        scale = min(1.0, max_h / float(h_orig))
+        if scale < 0.99:
+            w_p = int(w_orig * scale)
+            h_p = int(h_orig * scale)
+            w_p = w_p if w_p % 2 == 0 else w_p - 1
+            h_p = h_p if h_p % 2 == 0 else h_p - 1
+            proc_frames = [cv2.resize(f, (w_p, h_p), interpolation=cv2.INTER_AREA) for f in frames_rgb]
+        else:
+            w_p, h_p = w_orig, h_orig
+            proc_frames = frames_rgb
+
+        num_frames = len(proc_frames)
+        prev_gray = None
+        
+        c1_traj_history = []
+        c2_traj_history = []
+        
+        out_fused = []
+        out_c1_kinetic = []
+        out_c2_kinetic = []
+        out_c1_mask = []
+        out_c2_mask = []
+        out_flow = []
+        out_grid = []
+
+        dual_motion_data = {
+            "fps": fps,
+            "width": w_p,
+            "height": h_p,
+            "char1_color": c1_rgb,
+            "char2_color": c2_rgb,
+            "char1_contours": [],
+            "char2_contours": [],
+            "char1_velocities": [],
+            "char2_velocities": []
+        }
+
+        kernel_morph = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+
+        for fi in range(num_frames):
+            frame = proc_frames[fi]
+            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+            # 1. Total foreground
+            fg_raw = gray > 18
+            fg_clean = cv2.morphologyEx(fg_raw.astype(np.uint8)*255, cv2.MORPH_CLOSE, kernel_morph)
+
+            # 2. Separate Char 1 (White outfit) vs Char 2 (Black outfit)
+            c1_raw = (gray > luminance_threshold) & (fg_clean > 0)
+            c1_mask = cv2.morphologyEx(c1_raw.astype(np.uint8)*255, cv2.MORPH_CLOSE, kernel_morph)
+
+            c2_raw = (fg_clean > 0) & (c1_mask == 0)
+            c2_mask = cv2.morphologyEx(c2_raw.astype(np.uint8)*255, cv2.MORPH_OPEN, kernel_morph)
+
+            # 3. Dense Optical Flow
+            flow_vis = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+            avg_v1 = 1.0
+            avg_v2 = 1.0
+            if dense_optical_flow == "enable":
+                if prev_gray is not None:
+                    flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+                    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+                    hsv = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+                    hsv[..., 0] = ang * 180 / np.pi / 2
+                    hsv[..., 1] = 255
+                    hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+                    flow_vis = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+                    if np.any(c1_mask > 0):
+                        avg_v1 = float(np.mean(mag[c1_mask > 0]))
+                    if np.any(c2_mask > 0):
+                        avg_v2 = float(np.mean(mag[c2_mask > 0]))
+                prev_gray = gray.copy()
+
+            # 4. Find Centroids and Active Contours for Char 1 & Char 2
+            cnts1, _ = cv2.findContours(c1_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts2, _ = cv2.findContours(c2_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            pt1_list = []
+            for c in cnts1:
+                if cv2.contourArea(c) > 150:
+                    M = cv2.moments(c)
+                    if M["m00"] > 0:
+                        pt1_list.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
+            
+            pt2_list = []
+            for c in cnts2:
+                if cv2.contourArea(c) > 150:
+                    M = cv2.moments(c)
+                    if M["m00"] > 0:
+                        pt2_list.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
+
+            c1_traj_history.append(pt1_list)
+            c2_traj_history.append(pt2_list)
+
+            # Draw Kinetic Motion Curves
+            canvas_c1 = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+            canvas_c2 = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+            canvas_fused = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+
+            start_t = max(0, fi - trail_window)
+            
+            # Char 1 (RED)
+            pts_1_seq = [c1_traj_history[t] for t in range(start_t, fi + 1) if c1_traj_history[t]]
+            if len(pts_1_seq) >= 2:
+                flat_1 = [pts[0] for pts in pts_1_seq if len(pts) > 0]
+                spline_1 = self._catmull_rom(flat_1, num_samples=6) if spline_type == "catmull_rom_spline" else flat_1
+                for j in range(len(spline_1) - 1):
+                    alpha = (j + 1) / max(1, len(spline_1))
+                    th = max(2, int(stroke_base_thickness * alpha * min(2.5, 1.0 + avg_v1 * 0.1 * speed_to_width_factor)))
+                    color_a = tuple(int(c * alpha) for c in c1_rgb)
+                    cv2.line(canvas_c1, spline_1[j], spline_1[j+1], color_a, th, cv2.LINE_AA)
+                    cv2.line(canvas_fused, spline_1[j], spline_1[j+1], color_a, th, cv2.LINE_AA)
+
+            # Char 2 (GREEN)
+            pts_2_seq = [c2_traj_history[t] for t in range(start_t, fi + 1) if c2_traj_history[t]]
+            if len(pts_2_seq) >= 2:
+                flat_2 = [pts[0] for pts in pts_2_seq if len(pts) > 0]
+                spline_2 = self._catmull_rom(flat_2, num_samples=6) if spline_type == "catmull_rom_spline" else flat_2
+                for j in range(len(spline_2) - 1):
+                    alpha = (j + 1) / max(1, len(spline_2))
+                    th = max(2, int(stroke_base_thickness * alpha * min(2.5, 1.0 + avg_v2 * 0.1 * speed_to_width_factor)))
+                    color_a = tuple(int(c * alpha) for c in c2_rgb)
+                    cv2.line(canvas_c2, spline_2[j], spline_2[j+1], color_a, th, cv2.LINE_AA)
+                    cv2.line(canvas_fused, spline_2[j], spline_2[j+1], color_a, th, cv2.LINE_AA)
+
+            # Diagnostic Grid (2x4)
+            grid = np.zeros((h_p * 2, w_p * 2, 3), dtype=np.uint8)
+            # Top-Left: Original
+            grid[0:h_p, 0:w_p] = frame
+            # Top-Right: Char 1 Mask
+            c1_mask_3c = cv2.cvtColor(c1_mask, cv2.COLOR_GRAY2RGB)
+            c1_mask_3c[:, :, 0] = np.clip(c1_mask_3c[:, :, 0] * 1.0, 0, 255).astype(np.uint8)
+            grid[0:h_p, w_p:w_p*2] = c1_mask_3c
+            # Bottom-Left: Char 2 Mask
+            c2_mask_3c = cv2.cvtColor(c2_mask, cv2.COLOR_GRAY2RGB)
+            c2_mask_3c[:, :, 1] = np.clip(c2_mask_3c[:, :, 1] * 1.0, 0, 255).astype(np.uint8)
+            grid[h_p:h_p*2, 0:w_p] = c2_mask_3c
+            # Bottom-Right: Dual Kinetic Fused (Red + Green)
+            grid[h_p:h_p*2, w_p:w_p*2] = canvas_fused
+
+            out_fused.append(canvas_fused.astype(np.float32) / 255.0)
+            out_c1_kinetic.append(canvas_c1.astype(np.float32) / 255.0)
+            out_c2_kinetic.append(canvas_c2.astype(np.float32) / 255.0)
+            out_c1_mask.append(cv2.cvtColor(c1_mask, cv2.COLOR_GRAY2RGB).astype(np.float32) / 255.0)
+            out_c2_mask.append(cv2.cvtColor(c2_mask, cv2.COLOR_GRAY2RGB).astype(np.float32) / 255.0)
+            out_flow.append(flow_vis.astype(np.float32) / 255.0)
+            out_grid.append(grid.astype(np.float32) / 255.0)
+
+            dual_motion_data["char1_contours"].append(pt1_list)
+            dual_motion_data["char2_contours"].append(pt2_list)
+            dual_motion_data["char1_velocities"].append(avg_v1)
+            dual_motion_data["char2_velocities"].append(avg_v2)
+
+        # Output video file
+        temp_dir = folder_paths.get_temp_directory()
+        tmp_mp4 = os.path.join(temp_dir, f"dual_kinetic_motion_{int(time.time())}.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w_p, h_p))
+        for f in out_fused:
+            out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+        out_w.release()
+
+        return (
+            torch.from_numpy(np.array(out_fused, dtype=np.float32)),
+            torch.from_numpy(np.array(out_grid, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c1_mask, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c2_mask, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c1_kinetic, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c2_kinetic, dtype=np.float32)),
+            torch.from_numpy(np.array(out_flow, dtype=np.float32)),
+            tmp_mp4,
+            dual_motion_data
+        )
+
+
+class DualPersonTAPNetTracker:
+    """
+    Dual-Person TAPNet Point Tracker.
+    Seeds persistent surface points independently on Character 1 (Yellow)
+    and Character 2 (Blue) using their respective segmentation masks.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE,),
+                "char1_mask": (ANY_TYPE, {"tooltip": "Character 1 (White Dancer) Segmentation Mask"}),
+                "char2_mask": (ANY_TYPE, {"tooltip": "Character 2 (Black Dancer) Segmentation Mask"}),
+            },
+            "optional": {
+                "char1_tapnet_color": (["yellow", "gold", "red", "white"], {"default": "yellow"}),
+                "char2_tapnet_color": (["blue", "cyan", "green", "white"], {"default": "blue"}),
+                "num_points_per_character": ("INT", {"default": 64, "min": 16, "max": 256, "step": 16}),
+                "trail_window": ("INT", {"default": 16, "min": 2, "max": 60, "step": 1}),
+                "point_radius": ("INT", {"default": 4, "min": 1, "max": 12, "step": 1}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING", "DUAL_TAPNET_POINT_DATA")
+    RETURN_NAMES = (
+        "dual_tapnet_preview",
+        "char1_tapnet_yellow",
+        "char2_tapnet_blue",
+        "tapnet_video_file",
+        "dual_tapnet_point_data"
+    )
+    FUNCTION = "track_dual_points"
+    CATEGORY = "kinetic_motion"
+
+    def _extract_frames(self, inp):
+        if inp is None: return []
+        v_path = get_video_file_path(inp)
+        if v_path and os.path.exists(v_path):
+            frames = []
+            cap = cv2.VideoCapture(v_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+            return frames
+        if isinstance(inp, torch.Tensor):
+            t = inp
+            if len(t.shape) == 3: t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            return [np_frames[i] for i in range(np_frames.shape[0])]
+        if isinstance(inp, list):
+            res = []
+            for item in inp: res.extend(self._extract_frames(item))
+            return res
+        return []
+
+    def track_dual_points(self, video_or_images, char1_mask, char2_mask, char1_tapnet_color="yellow", char2_tapnet_color="blue", num_points_per_character=64, trail_window=16, point_radius=4, fps=24, max_resolution="720p (Fastest)"):
+        c_map = {
+            "yellow": (255, 215, 0),
+            "gold": (255, 190, 30),
+            "blue": (0, 136, 255),
+            "cyan": (0, 240, 255),
+            "green": (0, 255, 127),
+            "red": (255, 42, 77),
+            "white": (245, 245, 255)
+        }
+        c1_rgb = c_map.get(char1_tapnet_color, (255, 215, 0))
+        c2_rgb = c_map.get(char2_tapnet_color, (0, 136, 255))
+
+        raw_frames = self._extract_frames(video_or_images)
+        m1_frames = self._extract_frames(char1_mask)
+        m2_frames = self._extract_frames(char2_mask)
+
+        if not raw_frames:
+            raise ValueError("[DualPersonTAPNetTracker] No video frames found.")
+
+        num_frames = len(raw_frames)
+        h, w = raw_frames[0].shape[:2]
+
+        # Seed initial points inside masks
+        m1_init = cv2.cvtColor(m1_frames[0], cv2.COLOR_RGB2GRAY) if m1_frames else (cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY) > 110).astype(np.uint8)*255
+        m2_init = cv2.cvtColor(m2_frames[0], cv2.COLOR_RGB2GRAY) if m2_frames else (cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY) <= 110).astype(np.uint8)*255
+
+        pts1_init = cv2.goodFeaturesToTrack(cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY), maxCorners=num_points_per_character, qualityLevel=0.01, minDistance=8, mask=m1_init)
+        pts2_init = cv2.goodFeaturesToTrack(cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY), maxCorners=num_points_per_character, qualityLevel=0.01, minDistance=8, mask=m2_init)
+
+        p1_curr = pts1_init if pts1_init is not None else np.zeros((0, 1, 2), dtype=np.float32)
+        p2_curr = pts2_init if pts2_init is not None else np.zeros((0, 1, 2), dtype=np.float32)
+
+        prev_gray = cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY)
+        
+        tracks1 = [p1_curr.reshape(-1, 2)]
+        tracks2 = [p2_curr.reshape(-1, 2)]
+
+        for fi in range(1, num_frames):
+            gray = cv2.cvtColor(raw_frames[fi], cv2.COLOR_RGB2GRAY)
+            
+            # Track Char 1
+            if len(p1_curr) > 0:
+                p1_next, st1, err1 = cv2.calcOpticalFlowPyrLK(prev_gray, gray, p1_curr, None, winSize=(15, 15), maxLevel=2)
+                p1_curr = p1_next[st1 == 1].reshape(-1, 1, 2)
+            tracks1.append(p1_curr.reshape(-1, 2))
+
+            # Track Char 2
+            if len(p2_curr) > 0:
+                p2_next, st2, err2 = cv2.calcOpticalFlowPyrLK(prev_gray, gray, p2_curr, None, winSize=(15, 15), maxLevel=2)
+                p2_curr = p2_next[st2 == 1].reshape(-1, 1, 2)
+            tracks2.append(p2_curr.reshape(-1, 2))
+
+            prev_gray = gray
+
+        # Render visualizations
+        out_dual = []
+        out_c1 = []
+        out_c2 = []
+
+        for fi in range(num_frames):
+            canv_dual = np.zeros((h, w, 3), dtype=np.uint8)
+            canv_c1 = np.zeros((h, w, 3), dtype=np.uint8)
+            canv_c2 = np.zeros((h, w, 3), dtype=np.uint8)
+
+            start_t = max(0, fi - trail_window)
+
+            # Char 1 (YELLOW)
+            for pt in tracks1[fi]:
+                cv2.circle(canv_c1, (int(pt[0]), int(pt[1])), point_radius, c1_rgb, -1)
+                cv2.circle(canv_dual, (int(pt[0]), int(pt[1])), point_radius, c1_rgb, -1)
+            for t in range(start_t, fi):
+                for p_idx in range(min(len(tracks1[t]), len(tracks1[t+1]))):
+                    alpha = (t - start_t + 1) / float(trail_window)
+                    col = tuple(int(c * alpha) for c in c1_rgb)
+                    pt_a = tuple(tracks1[t][p_idx].astype(int))
+                    pt_b = tuple(tracks1[t+1][p_idx].astype(int))
+                    cv2.line(canv_c1, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
+                    cv2.line(canv_dual, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
+
+            # Char 2 (BLUE)
+            for pt in tracks2[fi]:
+                cv2.circle(canv_c2, (int(pt[0]), int(pt[1])), point_radius, c2_rgb, -1)
+                cv2.circle(canv_dual, (int(pt[0]), int(pt[1])), point_radius, c2_rgb, -1)
+            for t in range(start_t, fi):
+                for p_idx in range(min(len(tracks2[t]), len(tracks2[t+1]))):
+                    alpha = (t - start_t + 1) / float(trail_window)
+                    col = tuple(int(c * alpha) for c in c2_rgb)
+                    pt_a = tuple(tracks2[t][p_idx].astype(int))
+                    pt_b = tuple(tracks2[t+1][p_idx].astype(int))
+                    cv2.line(canv_c2, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
+                    cv2.line(canv_dual, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
+
+            out_dual.append(canv_dual.astype(np.float32) / 255.0)
+            out_c1.append(canv_c1.astype(np.float32) / 255.0)
+            out_c2.append(canv_c2.astype(np.float32) / 255.0)
+
+        temp_dir = folder_paths.get_temp_directory()
+        tmp_mp4 = os.path.join(temp_dir, f"dual_tapnet_tracker_{int(time.time())}.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w, h))
+        for f in out_dual:
+            out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+        out_w.release()
+
+        dual_tapnet_data = {
+            "fps": fps,
+            "width": w,
+            "height": h,
+            "char1_color": c1_rgb,
+            "char2_color": c2_rgb,
+            "tracks1": tracks1,
+            "tracks2": tracks2
+        }
+
+        return (
+            torch.from_numpy(np.array(out_dual, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c1, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c2, dtype=np.float32)),
+            tmp_mp4,
+            dual_tapnet_data
+        )
+
+
+class DualPersonBrushFusionRenderer:
+    """
+    Dual-Person Brush Fusion Renderer.
+    Fuses Character 1 (Red Kinetic + Yellow TAPNet) and
+    Character 2 (Green Kinetic + Blue TAPNet) into an expressive,
+    multi-colored physical oil paint brushstroke video.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "dual_motion_data": (ANY_TYPE, {"tooltip": "Kinetic motion data from DualPersonKineticMotionExtractor"}),
+                "dual_tapnet_data": (ANY_TYPE, {"tooltip": "Point trajectory data from DualPersonTAPNetTracker"}),
+            },
+            "optional": {
+                "color_palette_mode": (["specified_palette (Red+Yellow vs Green+Blue)", "vibrant_contrast", "warm_cool_split"], {"default": "specified_palette (Red+Yellow vs Green+Blue)"}),
+                "paint_decay": ("FLOAT", {"default": 0.88, "min": 0.5, "max": 0.99, "step": 0.01}),
+                "impasto_strength": ("FLOAT", {"default": 1.5, "min": 0.5, "max": 3.0, "step": 0.1}),
+                "glow_bloom": (["enable", "disable"], {"default": "enable"}),
+                "ember_sparks": (["enable", "disable"], {"default": "enable"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = (
+        "dual_fused_brush_canvas",
+        "char1_fused_red_yellow",
+        "char2_fused_green_blue",
+        "fused_video_file"
+    )
+    FUNCTION = "render_dual_fusion"
+    CATEGORY = "kinetic_motion"
+
+    def render_dual_fusion(self, dual_motion_data, dual_tapnet_data, color_palette_mode="specified_palette (Red+Yellow vs Green+Blue)", paint_decay=0.88, impasto_strength=1.5, glow_bloom="enable", ember_sparks="enable", fps=24):
+        w = dual_motion_data.get("width", 1280) if isinstance(dual_motion_data, dict) else 1280
+        h = dual_motion_data.get("height", 720) if isinstance(dual_motion_data, dict) else 720
+
+        # Colors:
+        # Char 1: Kinetic = RED (255, 42, 77), TAPNet = YELLOW (255, 215, 0)
+        # Char 2: Kinetic = GREEN (0, 255, 127), TAPNet = BLUE (0, 136, 255)
+        c1_kin = (255, 42, 77)
+        c1_tap = (255, 215, 0)
+        c2_kin = (0, 255, 127)
+        c2_tap = (0, 136, 255)
+
+        num_frames = 250
+        if isinstance(dual_motion_data, dict) and "char1_contours" in dual_motion_data:
+            num_frames = len(dual_motion_data["char1_contours"])
+        elif isinstance(dual_tapnet_data, dict) and "tracks1" in dual_tapnet_data:
+            num_frames = len(dual_tapnet_data["tracks1"])
+
+        accum_canvas = np.zeros((h, w, 3), dtype=np.float32)
+        accum_c1 = np.zeros((h, w, 3), dtype=np.float32)
+        accum_c2 = np.zeros((h, w, 3), dtype=np.float32)
+
+        out_fused = []
+        out_c1 = []
+        out_c2 = []
+
+        tracks1 = dual_tapnet_data.get("tracks1", []) if isinstance(dual_tapnet_data, dict) else []
+        tracks2 = dual_tapnet_data.get("tracks2", []) if isinstance(dual_tapnet_data, dict) else []
+        cnts1 = dual_motion_data.get("char1_contours", []) if isinstance(dual_motion_data, dict) else []
+        cnts2 = dual_motion_data.get("char2_contours", []) if isinstance(dual_motion_data, dict) else []
+
+        for fi in range(num_frames):
+            # Apply paint decay
+            accum_canvas *= paint_decay
+            accum_c1 *= paint_decay
+            accum_c2 *= paint_decay
+
+            curr_c1 = np.zeros((h, w, 3), dtype=np.uint8)
+            curr_c2 = np.zeros((h, w, 3), dtype=np.uint8)
+
+            # Render Character 1 (Red Kinetic + Yellow TAPNet)
+            if fi < len(cnts1) and cnts1[fi]:
+                for pt in cnts1[fi]:
+                    cv2.circle(curr_c1, pt, int(12 * impasto_strength), c1_kin, -1)
+            if fi < len(tracks1) and len(tracks1[fi]) > 0:
+                for pt in tracks1[fi]:
+                    cv2.circle(curr_c1, (int(pt[0]), int(pt[1])), 5, c1_tap, -1)
+
+            # Render Character 2 (Green Kinetic + Blue TAPNet)
+            if fi < len(cnts2) and cnts2[fi]:
+                for pt in cnts2[fi]:
+                    cv2.circle(curr_c2, pt, int(12 * impasto_strength), c2_kin, -1)
+            if fi < len(tracks2) and len(tracks2[fi]) > 0:
+                for pt in tracks2[fi]:
+                    cv2.circle(curr_c2, (int(pt[0]), int(pt[1])), 5, c2_tap, -1)
+
+            # Accumulate
+            accum_c1 = np.clip(accum_c1 + (curr_c1.astype(np.float32) / 255.0), 0.0, 1.0)
+            accum_c2 = np.clip(accum_c2 + (curr_c2.astype(np.float32) / 255.0), 0.0, 1.0)
+            accum_canvas = np.clip(accum_canvas + ((curr_c1 + curr_c2).astype(np.float32) / 255.0), 0.0, 1.0)
+
+            # Glow bloom
+            f_frame = accum_canvas.copy()
+            if glow_bloom == "enable":
+                blur = cv2.GaussianBlur(f_frame, (21, 21), 0)
+                f_frame = np.clip(f_frame + blur * 0.35, 0.0, 1.0)
+
+            out_fused.append(f_frame)
+            out_c1.append(accum_c1.copy())
+            out_c2.append(accum_c2.copy())
+
+        temp_dir = folder_paths.get_temp_directory()
+        tmp_mp4 = os.path.join(temp_dir, f"dual_person_brush_fusion_{int(time.time())}.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w, h))
+        for f in out_fused:
+            out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+        out_w.release()
+
+        return (
+            torch.from_numpy(np.array(out_fused, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c1, dtype=np.float32)),
+            torch.from_numpy(np.array(out_c2, dtype=np.float32)),
+            tmp_mp4
+        )
+
+
+class DualPersonStagePipelineViewer:
+    """
+    Dual-Person 9-Stage Synchronized Multi-Video Pipeline Viewer.
+    Composites all 9 individual stages for both dancers into a single HUD preview:
+      1. Original Dual-Dancer Video
+      2. Char 1 Mask (White Dancer)
+      3. Char 2 Mask (Black Dancer)
+      4. Char 1 Kinetic Splines (RED)
+      5. Char 1 TAPNet Points (YELLOW)
+      6. Char 2 Kinetic Splines (GREEN)
+      7. Char 2 TAPNet Points (BLUE)
+      8. Dual-Character Fused Dynamic Brushstrokes
+      9. Gemini Omni Final Stylized Masterpiece Video
+    """
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "original_video": (ANY_TYPE, {"tooltip": "1. Original Dual-Dancer Video"}),
+                "char1_mask_white": (ANY_TYPE, {"tooltip": "2. Char 1 Mask (White Dancer)"}),
+                "char2_mask_black": (ANY_TYPE, {"tooltip": "3. Char 2 Mask (Black Dancer)"}),
+                "char1_kinetic_red": (ANY_TYPE, {"tooltip": "4. Char 1 Kinetic Curves (RED)"}),
+                "char1_tapnet_yellow": (ANY_TYPE, {"tooltip": "5. Char 1 TAPNet Points (YELLOW)"}),
+                "char2_kinetic_green": (ANY_TYPE, {"tooltip": "6. Char 2 Kinetic Curves (GREEN)"}),
+                "char2_tapnet_blue": (ANY_TYPE, {"tooltip": "7. Char 2 TAPNet Points (BLUE)"}),
+                "dual_fuser_master": (ANY_TYPE, {"tooltip": "8. Dual Fused Dynamic Brushstrokes Canvas"}),
+                "gemini_omni_artwork": (ANY_TYPE, {"tooltip": "9. Gemini Omni Final Masterpiece Video"}),
+            },
+            "optional": {
+                "layout": (["grid_3x3", "grid_2x4_featured", "strip_horizontal"], {"default": "grid_3x3"}),
+                "show_hud_labels": (["enable", "disable"], {"default": "enable"}),
+                "frame_rate": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
+                "save_output": ("BOOLEAN", {"default": True}),
+                "filename_prefix": ("STRING", {"default": "Dual_Dancer_Pipeline"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("dual_pipeline_preview", "video_path")
+    OUTPUT_NODE = True
+    FUNCTION = "create_dual_pipeline_preview"
+    CATEGORY = "kinetic_motion"
+
+    def _extract_frames(self, inp):
+        if inp is None: return []
+        v_path = get_video_file_path(inp)
+        if v_path and os.path.exists(v_path):
+            frames = []
+            cap = cv2.VideoCapture(v_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+            return frames
+        if isinstance(inp, torch.Tensor):
+            t = inp
+            if len(t.shape) == 3: t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            return [np_frames[i] for i in range(np_frames.shape[0])]
+        if isinstance(inp, list):
+            res = []
+            for item in inp: res.extend(self._extract_frames(item))
+            return res
+        return []
+
+    def create_dual_pipeline_preview(
+        self,
+        original_video: Any,
+        char1_mask_white: Any,
+        char2_mask_black: Any,
+        char1_kinetic_red: Any,
+        char1_tapnet_yellow: Any,
+        char2_kinetic_green: Any,
+        char2_tapnet_blue: Any,
+        dual_fuser_master: Any,
+        gemini_omni_artwork: Any,
+        layout: str = "grid_3x3",
+        show_hud_labels: str = "enable",
+        frame_rate: int = 24,
+        format: str = "mp4",
+        save_output: bool = True,
+        filename_prefix: str = "Dual_Dancer_Pipeline"
+    ):
+        raw_inputs = [
+            original_video,
+            char1_mask_white,
+            char2_mask_black,
+            char1_kinetic_red,
+            char1_tapnet_yellow,
+            char2_kinetic_green,
+            char2_tapnet_blue,
+            dual_fuser_master,
+            gemini_omni_artwork
+        ]
+
+        stage_labels = [
+            "1. Original Video",
+            "2. Char 1 (White Mask)",
+            "3. Char 2 (Black Mask)",
+            "4. Char 1 Kinetic (RED)",
+            "5. Char 1 TAPNet (YELLOW)",
+            "6. Char 2 Kinetic (GREEN)",
+            "7. Char 2 TAPNet (BLUE)",
+            "8. Dual Brush Fuser",
+            "9. Gemini Omni Final Art"
+        ]
+
+        stage_colors = [
+            (220, 220, 220), # Gray/White
+            (240, 240, 255), # White
+            (140, 140, 160), # Dark Gray
+            (255, 42, 77),   # Red
+            (255, 215, 0),   # Yellow
+            (0, 255, 127),   # Green
+            (0, 136, 255),   # Blue
+            (255, 120, 240), # Multi-fusion
+            (255, 200, 40)   # Gold
+        ]
+
+        parsed = [self._extract_frames(inp) for inp in raw_inputs]
+        valid_lens = [len(s) for s in parsed if len(s) > 0]
+        if not valid_lens:
+            raise ValueError("[DualPersonStagePipelineViewer] No frames found across inputs.")
+        num_frames = min(valid_lens)
+
+        cell_w, cell_h = 426, 240 # 16:9 cell
+
+        comp_frames = []
+        pil_frames = []
+
+        for fi in range(num_frames):
+            if layout == "grid_3x3":
+                canvas_w, canvas_h = cell_w * 3, cell_h * 3
+                canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+                for i in range(9):
+                    row = i // 3
+                    col = i % 3
+                    stream = parsed[i]
+                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
+                    if show_hud_labels == "enable":
+                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
+                    canvas[row*cell_h:(row+1)*cell_h, col*cell_w:(col+1)*cell_w] = f_r
+            else: # strip_horizontal
+                canvas_w, canvas_h = cell_w * 9, cell_h
+                canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+                for i in range(9):
+                    stream = parsed[i]
+                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
+                    if show_hud_labels == "enable":
+                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
+                    canvas[0:cell_h, i*cell_w:(i+1)*cell_w] = f_r
+
+            comp_frames.append(canvas.astype(np.float32) / 255.0)
+            pil_frames.append(Image.fromarray(canvas))
+
+        out_tensor = torch.from_numpy(np.array(comp_frames, dtype=np.float32))
+
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, self.output_dir if save_output else self.temp_dir, canvas_w, canvas_h
+        )
+
+        saved_path = ""
+        ui_results = []
+        type_str = "output" if save_output else "temp"
+
+        if format == "mp4":
+            mp4_filename = f"{filename}_{counter:05d}.mp4"
+            saved_path = os.path.join(full_output_folder, mp4_filename)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out_writer = cv2.VideoWriter(saved_path, fourcc, float(frame_rate), (canvas_w, canvas_h))
+            for f in comp_frames:
+                out_writer.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+            out_writer.release()
+
+            preview_webp_name = f"{filename}_{counter:05d}_preview.webp"
+            preview_path = os.path.join(full_output_folder, preview_webp_name)
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            step = max(1, len(pil_frames) // 120) if len(pil_frames) > 120 else 1
+            prev_sub = [pil_frames[idx].resize((canvas_w // 2, canvas_h // 2), Image.Resampling.LANCZOS) for idx in range(0, len(pil_frames), step)]
+            prev_sub[0].save(preview_path, save_all=True, append_images=prev_sub[1:], duration=duration_ms * step, loop=0, quality=80)
+            ui_results.append({"filename": preview_webp_name, "subfolder": subfolder, "type": type_str, "format": "image/webp"})
+
+        elif format == "animated_webp":
+            webp_filename = f"{filename}_{counter:05d}.webp"
+            saved_path = os.path.join(full_output_folder, webp_filename)
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            pil_frames[0].save(saved_path, save_all=True, append_images=pil_frames[1:], duration=duration_ms, loop=0, quality=85)
+            ui_results.append({"filename": webp_filename, "subfolder": subfolder, "type": type_str, "format": "image/webp"})
+
+        elif format == "gif":
+            gif_filename = f"{filename}_{counter:05d}.gif"
+            saved_path = os.path.join(full_output_folder, gif_filename)
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            step = max(1, len(pil_frames) // 120) if len(pil_frames) > 120 else 1
+            prev_sub = [pil_frames[idx].resize((canvas_w // 2, canvas_h // 2), Image.Resampling.LANCZOS) for idx in range(0, len(pil_frames), step)]
+            prev_sub[0].save(saved_path, save_all=True, append_images=prev_sub[1:], duration=duration_ms * step, loop=0, optimize=True)
+            ui_results.append({"filename": gif_filename, "subfolder": subfolder, "type": type_str, "format": "image/gif"})
+
+        return {
+            "ui": {"images": ui_results},
+            "result": (out_tensor, saved_path)
+        }
+
+
 NODE_CLASS_MAPPINGS = {
     "GeminiProModel": GeminiProModel,
     "GeminiOmniModel": GeminiOmniModel,
@@ -3429,7 +4223,11 @@ NODE_CLASS_MAPPINGS = {
     "KineticEightStagePipelineViewer": KineticEightStagePipelineViewer,
     "EightStagePipelineViewer": KineticEightStagePipelineViewer,
     "KineticSevenStagePipelineViewer": KineticEightStagePipelineViewer,
-    "SevenStagePipelineViewer": KineticEightStagePipelineViewer
+    "SevenStagePipelineViewer": KineticEightStagePipelineViewer,
+    "DualPersonKineticMotionExtractor": DualPersonKineticMotionExtractor,
+    "DualPersonTAPNetTracker": DualPersonTAPNetTracker,
+    "DualPersonBrushFusionRenderer": DualPersonBrushFusionRenderer,
+    "DualPersonStagePipelineViewer": DualPersonStagePipelineViewer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -3451,5 +4249,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KineticEightStagePipelineViewer": "Kinetic 8-Stage Pipeline Viewer (All 8 Stages)",
     "EightStagePipelineViewer": "8-Stage Pipeline Viewer",
     "KineticSevenStagePipelineViewer": "Kinetic 8-Stage Pipeline Viewer (Legacy Alias)",
-    "SevenStagePipelineViewer": "8-Stage Pipeline Viewer (Legacy Alias)"
+    "SevenStagePipelineViewer": "8-Stage Pipeline Viewer (Legacy Alias)",
+    "DualPersonKineticMotionExtractor": "Dual-Person Kinetic Motion Extractor (White + Black Dancers)",
+    "DualPersonTAPNetTracker": "Dual-Person TAPNet Point Tracker (Yellow + Blue Points)",
+    "DualPersonBrushFusionRenderer": "Dual-Person Brush Fusion Renderer (Red/Yellow vs Green/Blue)",
+    "DualPersonStagePipelineViewer": "Dual-Person 9-Stage Pipeline Viewer (All Maps Synchronizer)"
 }

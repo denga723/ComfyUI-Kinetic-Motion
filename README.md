@@ -48,7 +48,31 @@ Designed specifically for AI animation, video-to-video generative stylization, a
 * **Occlusion-Aware Virtual Pen Lifting**: Automatically lifts the brush off canvas and tapers filaments when surface points become occluded behind the body.
 * **Kinetic Particle Embers**: Spawns dynamic glowing embers and sparks from high-velocity surface points.
 
-### 5. **Kinetic Multi-Stage Video Viewers & Comparison**
+---
+
+### 5. **Dual-Person / Multi-Dancer Kinematic Suite** (`DualPersonKineticMotionExtractor`, `DualPersonTAPNetTracker`, `DualPersonBrushFusionRenderer`)
+* **Individual Dancer Silhouette Separation**: Accurately isolates Character 1 (White / Light Attire) and Character 2 (Black / Dark Attire) into separate segmentation streams.
+* **Dual-Person Kinematic Motion Curves**:
+  - **Character 1 (White Dancer)**: Renders macro kinetic curves in **Vibrant RED** (`#FF2A4D`).
+  - **Character 2 (Black Dancer)**: Renders macro kinetic curves in **Vibrant GREEN** (`#00FF7F`).
+* **Dual-Person Surface Point Tracking (`DualPersonTAPNetTracker`)**:
+  - **Character 1**: Seeds and tracks surface points in **Luminous YELLOW** (`#FFD700`).
+  - **Character 2**: Seeds and tracks surface points in **Electric BLUE** (`#0088FF`).
+* **Dual Brush Fusion Canvas (`DualPersonBrushFusionRenderer`)**: Combines both dancers' 4-color kinetic and point streams into a rich, physical oil paint multi-character canvas with temporal paint decay and impasto relief.
+* **Dual-Person 9-Stage Pipeline Viewer (`DualPersonStagePipelineViewer`)**: Composites and synchronizes all 9 stages in a $3 \times 3$ grid or horizontal strip:
+  1. Original Dual-Dancer Video
+  2. Character 1 (White Mask)
+  3. Character 2 (Black Mask)
+  4. Character 1 Kinetic Curves (RED)
+  5. Character 1 TAPNet Points (YELLOW)
+  6. Character 2 Kinetic Curves (GREEN)
+  7. Character 2 TAPNet Points (BLUE)
+  8. Master Dual-Character Brushstrokes Canvas
+  9. Gemini Omni Final Stylized Masterpiece Video
+
+---
+
+### 6. **Kinetic Multi-Stage Video Viewers & Comparison**
 * **`KineticEightStagePipelineViewer` (8-Stage Full Pipeline Multi-Video Preview)**:
   - Composites all 8 pipeline stages into a unified, synchronized $2 \times 4$ HUD comparison video with live inline preview:
     1. Original Source Dancer Video
@@ -68,7 +92,7 @@ Designed specifically for AI animation, video-to-video generative stylization, a
 
 ---
 
-### 6. **Gemini Enterprise & Multimodal Suite**
+### 7. **Gemini Enterprise & Multimodal Suite**
 * **`GeminiOmniModel` & `GeminiProModel`**: Connects ComfyUI directly to Google Gemini Multimodal / Omni models for video and image stylization, analysis, and prompting.
 * **`GeminiAuthConfig`**: Centralized, secure authentication handling for Google Cloud / Gemini API keys and Service Accounts.
 * **`GeminiJobBatcher`**: High-throughput asynchronous batching engine with concurrent queue management.
