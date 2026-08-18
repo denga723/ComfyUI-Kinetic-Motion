@@ -2,7 +2,7 @@ import { app } from "/scripts/app.js";
 
 const DEFAULT_CONFIG = {
     model_name: "gemini-omni-flash-preview",
-    task: "image_to_video",
+    task: "video_editing",
     duration: 8,
     aspect_ratio: "16:9",
     delivery: "base64",

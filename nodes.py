@@ -586,7 +586,7 @@ class GeminiOmniModel:
                     if p.get("type") == "image":
                         img_count += 1
                         img_id = f"Image{img_count}"
-                        default_role = "first-frame" if img_count == 1 else "reference"
+                        default_role = "reference"
                         role = image_roles.get(img_id, default_role)
                         
                         if role == "first-frame" and not first_frame_id:

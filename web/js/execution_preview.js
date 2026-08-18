@@ -170,7 +170,7 @@ app.registerExtension({
                         
                         let pre = config.prefix_text || "";
                         let suf = config.suffix_text || "";
-                        let task = config.task || "image_to_video";
+                        let task = config.task || "video_editing";
                         
                         let ar = config.aspect_ratio || "16:9";
                         let durStr = config.duration ? `[0-${config.duration}s] ` : "";
@@ -234,7 +234,7 @@ app.registerExtension({
                                 inputsPanel.style.opacity = "0.45";
                                 inputsPanel.style.pointerEvents = "none";
                             } else {
-                                inputsPanel.style.opacity = "1.0";
+                                inputsPanel.style.opacity = "1";
                                 inputsPanel.style.pointerEvents = "auto";
                             }
 
@@ -257,19 +257,10 @@ app.registerExtension({
                                 inputsPanel.appendChild(vRow);
                             }
 
-                            // 2. Render Image Inputs
-                            let hasFirstFrame = false;
+                            // 2. Render Image Inputs (all default to "reference")
                             for (let i = 0; i < imageCount; i++) {
                                 let imgId = "Image" + (i + 1);
-                                let currentRole = config.image_roles[imgId] || (i === 0 ? "first-frame" : "reference");
-                                if (currentRole === "first-frame") {
-                                    if (hasFirstFrame) {
-                                        config.image_roles[imgId] = "reference";
-                                    } else {
-                                        hasFirstFrame = true;
-                                        config.image_roles[imgId] = "first-frame";
-                                    }
-                                } else {
+                                if (!config.image_roles[imgId]) {
                                     config.image_roles[imgId] = "reference";
                                 }
                             }
