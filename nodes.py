@@ -2673,6 +2673,7 @@ class KineticTAPNetBrushFusionRenderer:
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
                 "brush_color_mode": ([
+                    "duet_harmonic_quad_color",
                     "green_kinetic_red_tapnet",
                     "white_kinetic_colorful_tapnet",
                     "white_kinetic_pinkred_tapnet",
@@ -2693,7 +2694,7 @@ class KineticTAPNetBrushFusionRenderer:
                     "luminous_white",
                     "warm_amber",
                     "cool_cyan"
-                ], {"default": "green_kinetic_red_tapnet", "tooltip": "Color palette preset structure: <kinetic_color>_kinetic_<tapnet_color>_tapnet"}),
+                ], {"default": "duet_harmonic_quad_color", "tooltip": "Color palette preset structure: <kinetic_color>_kinetic_<tapnet_color>_tapnet"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Target frame rate"}),
             }
         }
@@ -2741,7 +2742,7 @@ class KineticTAPNetBrushFusionRenderer:
         optical_flow_strength: float = 0.4,
         glow_strength: float = 0.6,
         occlusion_pen_lift: str = "enable",
-        brush_color_mode: str = "green_kinetic_red_tapnet",
+        brush_color_mode: str = "duet_harmonic_quad_color",
         fps: int = 24
     ):
         if not isinstance(motion_input, dict):
@@ -2757,7 +2758,20 @@ class KineticTAPNetBrushFusionRenderer:
         # Dynamic Color Palette Presets
         is_tapnet_rainbow = False
 
-        if brush_color_mode in ["white_kinetic_white_tapnet", "luminous_white"]:
+        if brush_color_mode == "duet_harmonic_quad_color":
+            # Dynamic Duet Harmonies: Crimson Red & Gold Yellow for upper body gestures, Emerald Green & Cyan/Blue for lower/footwork lines
+            skeletal_palette = {
+                15: (1.0, 0.16, 0.30), 16: (1.0, 0.16, 0.30), # Wrists (Crimson Red)
+                13: (1.0, 0.80, 0.15), 14: (1.0, 0.80, 0.15), # Elbows (Warm Yellow Gold)
+                27: (0.10, 1.00, 0.40), 28: (0.10, 1.00, 0.40), # Ankles (Emerald Green)
+                25: (0.05, 0.60, 1.00), 26: (0.05, 0.60, 1.00), # Knees (Electric Blue)
+                11: (1.0, 0.35, 0.20), 12: (1.0, 0.35, 0.20), # Shoulders
+                23: (0.05, 0.90, 0.80), 24: (0.05, 0.90, 0.80), # Hips
+                "default": (1.0, 0.80, 0.20)
+            }
+            is_tapnet_rainbow = True
+            filament_base = (1.0, 0.85, 0.20)
+        elif brush_color_mode in ["white_kinetic_white_tapnet", "luminous_white"]:
             skeletal_palette = {
                 15: (1.0, 1.0, 1.0), 16: (1.0, 1.0, 1.0), 27: (0.95, 0.98, 1.0), 28: (0.95, 0.98, 1.0),
                 "default": (0.95, 0.98, 1.0)
