@@ -580,13 +580,13 @@ class GeminiOmniModel:
 
                 if vid_ids:
                     sources_clauses.append(f"[# Sources @{vid_ids[0]}]")
-                    guiding_instructions.append(f"Perform video style transfer: Strictly preserve the camera movement, motion trajectory, actions, structure, and timing from {vid_ids[0]}.")
+                    guiding_instructions.append(f"Perform video style transfer: Strictly preserve the exact motion paths, trajectories, curves, velocity, and timing of {vid_ids[0]}.")
 
                 if ref_clauses:
                     ref_str = " ".join(ref_clauses)
                     sources_clauses.append(f"[# References {ref_str}]")
                     ref_ids_str = ", ".join(ref_img_ids)
-                    guiding_instructions.append(f"Re-render and style the scene according to the visual appearance, color palette, texture, and aesthetic style of {ref_ids_str}.")
+                    guiding_instructions.append(f"Render the moving brushstrokes with the oil paint texture, impasto brush marks, and color palette from {ref_ids_str}.")
             elif task != "text_to_video":
                 # Image-to-Video mode: Image1 is the first frame, Video1 is motion reference
                 for p in inputs_payload:
@@ -2721,144 +2721,11 @@ class KineticTAPNetBrushFusionRenderer:
         return curve
 
     def _generate_dynamic_prompt(self, brush_color_mode: str) -> str:
-        prompts_map = {
-            "green_kinetic_red_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the vibrant neon green kinetic ribbons as dynamic, sweeping strokes of rich emerald and cadmium green impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single radiant glowing red tracking dot and filament as an autonomous droplet of glistening, thick crimson and vermilion oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the green structural ribbons and red surface filaments self-paint across the scene, blending rich green and crimson paint "
-                "against the pure dark void with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_colorful_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single radiant multi-colored tracking dot and filament as an autonomous droplet of glistening rainbow oil paint "
-                "(crimson, cobalt, gold, emerald, violet) that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the white structural ribbons and colorful surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_pinkred_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single glowing pink and red tracking dot and filament as an autonomous droplet of glistening magenta, crimson, and rose oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the white structural ribbons and pink-red surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_red_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single glowing red tracking dot and filament as an autonomous droplet of glistening crimson and vermilion oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the white structural ribbons and red surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_green_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single vibrant green tracking dot and filament as an autonomous droplet of glistening emerald and viridian oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the white structural ribbons and emerald green surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_blue_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single electric blue tracking dot and filament as an autonomous droplet of glistening ultramarine, cerulean, and azure oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the white structural ribbons and blue surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_amber_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the pure luminous white kinetic ribbons as dynamic, sweeping strokes of thick titanium white impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single golden amber tracking dot and filament as an autonomous droplet of glistening cadmium gold and warm ochre oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the white structural ribbons and golden surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "white_kinetic_white_tapnet": (
-                "Masterpiece self-moving animated monochrome oil painting on deep black canvas. "
-                "Interpret both the kinetic ribbons and tracking dots as pure luminous strokes and droplets of thick titanium white impasto oil paint "
-                "with visible palette-knife textures, wet brush ridges, and heavy physical relief. "
-                "As the dancer moves, the white calligraphy ribbons and delicate white surface filaments self-paint across the scene against the pure dark void "
-                "with dramatic studio lighting, ultra-detailed fine art."
-            ),
-            "colorful_kinetic_white_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the dynamic kinetic ribbons as sweeping multi-colored strokes of thick rainbow impasto oil paint "
-                "(emerald, cobalt, crimson, amber, violet) with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single tracking dot and filament as an autonomous droplet of glistening, thick titanium white oil paint "
-                "that blooms and swirls into fine wet white filaments with luminous glowing embers. "
-                "As the dancer moves, the colorful structural ribbons and delicate white surface filaments self-paint across the scene "
-                "against the pure dark void with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
-            ),
-            "green_kinetic_colorful_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the vibrant green kinetic ribbons as dynamic, sweeping strokes of rich emerald and jade impasto oil paint. "
-                "Interpret every single tracking dot and filament as an autonomous droplet of glistening multi-colored rainbow oil paint. "
-                "As the dancer moves, the green structural ribbons and rainbow surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-            "gold_kinetic_cyan_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the rich golden amber kinetic ribbons as dynamic, sweeping strokes of warm gold, cadmium yellow, and ochre impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single electric cyan tracking dot and filament as an autonomous droplet of glistening turquoise, teal, and cyan oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the golden structural ribbons and cyan surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-            "pink_kinetic_cyan_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the hot magenta pink kinetic ribbons as dynamic, sweeping strokes of vivid magenta, rose, and pink impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single electric cyan tracking dot and filament as an autonomous droplet of glistening turquoise, aqua, and cyan oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the pink structural ribbons and cyan surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-            "blue_kinetic_amber_tapnet": (
-                "Masterpiece self-moving animated oil painting on deep black canvas. "
-                "Interpret the deep cobalt blue kinetic ribbons as dynamic, sweeping strokes of rich ultramarine and navy impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "Interpret every single golden amber tracking dot and filament as an autonomous droplet of glistening cadmium gold and warm amber oil paint "
-                "that blooms and swirls into fine wet filaments with glowing embers. "
-                "As the dancer moves, the blue structural ribbons and golden surface filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-            "amber_kinetic_amber_tapnet": (
-                "Masterpiece self-moving animated warm oil painting on deep black canvas. "
-                "Interpret both the kinetic ribbons and tracking dots as rich strokes and droplets of warm golden amber, flame orange, and ochre impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "As the dancer moves, the fiery ribbons and warm filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-            "cyan_kinetic_cyan_tapnet": (
-                "Masterpiece self-moving animated cool oil painting on deep black canvas. "
-                "Interpret both the kinetic ribbons and tracking dots as electric strokes and droplets of cyan, turquoise, and deep indigo impasto oil paint "
-                "with visible palette-knife textures and heavy physical relief. "
-                "As the dancer moves, the cool luminous ribbons and cyan filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-            "colorful_kinetic_colorful_tapnet": (
-                "Masterpiece self-moving animated multi-color oil painting on deep black canvas. "
-                "Interpret the kinetic ribbons and all tracking dots as a vibrant spectrum of glistening impasto oil paint (crimson, gold, emerald, cobalt, violet) "
-                "with rich 3D palette-knife textures, glistening wet paint ridges, and dynamic glowing particle embers. "
-                "As the dancer moves, the rainbow ribbons and multi-colored filaments self-paint across the scene against the pure dark void, ultra-detailed fine art."
-            ),
-        }
-        # Fallback aliases
-        alias_map = {
-            "luminous_white": "white_kinetic_white_tapnet",
-            "kinetic_spectrum": "colorful_kinetic_colorful_tapnet",
-            "warm_amber": "amber_kinetic_amber_tapnet",
-            "cool_cyan": "cyan_kinetic_cyan_tapnet"
-        }
-        effective_mode = alias_map.get(brush_color_mode, brush_color_mode)
-        return prompts_map.get(effective_mode, prompts_map["green_kinetic_red_tapnet"])
+        return (
+            "Perform video style transfer on Video1 using the oil painting texture, impasto brush marks, and color palette from the reference keyframe images (Image1, Image2, Image3, Image4). "
+            "Strictly preserve the exact motion paths, trajectories, curves, velocity, and timing of the moving strokes from Video1. "
+            "Do not alter the structure or animation layout of Video1."
+        )
 
     def render_fused_brush_strokes(
         self,

@@ -1224,7 +1224,7 @@
         "Node name for S&R": "PrimitiveStringMultiline"
       },
       "widgets_values": [
-        "Masterpiece self-moving animated oil painting on deep black canvas. Interpret the vibrant neon green kinetic ribbons as dynamic, sweeping strokes of rich emerald and cadmium green impasto oil paint with visible palette-knife textures and heavy physical relief. Interpret every single radiant glowing red tracking dot and filament as an autonomous droplet of glistening, thick crimson and vermilion oil paint that blooms and swirls into fine wet filaments with glowing embers. As the dancer moves, the green structural ribbons and red surface filaments self-paint across the scene, blending rich green and crimson paint against the pure dark void with dramatic raking studio light illuminating every 3D wet paint ridge, ultra-detailed fine art."
+        "Perform video style transfer on Video1 using the oil painting texture, impasto brush marks, and color palette from Image1, Image2, Image3, and Image4. Strictly preserve the exact motion paths, trajectories, curves, velocity, and timing of the moving strokes from Video1 without altering its structure or animation layout."
       ]
     },
     {
