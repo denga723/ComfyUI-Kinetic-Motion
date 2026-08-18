@@ -1,13 +1,13 @@
 {
-  "last_node_id": 70,
-  "last_link_id": 60,
+  "last_node_id": 61,
+  "last_link_id": 25,
   "nodes": [
     {
       "id": 1,
       "type": "LoadVideo",
       "pos": [
-        60,
-        120
+        80,
+        140
       ],
       "size": [
         320,
@@ -16,15 +16,16 @@
       "flags": {},
       "order": 0,
       "mode": 0,
+      "title": "Source Human Dancing Video",
       "inputs": [],
       "outputs": [
         {
-          "name": "IMAGE",
-          "type": "IMAGE",
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
           "links": [
             1
-          ],
-          "slot_index": 0
+          ]
         }
       ],
       "properties": {
@@ -33,92 +34,174 @@
       "widgets_values": [
         "Screen_Recording_dancing_dance.mp4",
         "video"
-      ],
-      "title": "Source Dancing / Motion Video"
+      ]
     },
     {
-      "id": 2,
+      "id": 50,
       "type": "KineticMotionCurveExtractor",
       "pos": [
-        420,
-        120
+        440,
+        140
       ],
       "size": [
         360,
-        480
+        460
       ],
       "flags": {},
       "order": 1,
       "mode": 0,
+      "title": "Google Kinetic Motion Curve Extractor",
       "inputs": [
         {
+          "localized_name": "video_or_images",
           "name": "video_or_images",
           "type": "*",
           "link": 1
+        },
+        {
+          "localized_name": "spline_type",
+          "name": "spline_type",
+          "type": "COMBO",
+          "widget": {
+            "name": "spline_type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_window",
+          "name": "trail_window",
+          "type": "INT",
+          "widget": {
+            "name": "trail_window"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "stroke_base_thickness",
+          "name": "stroke_base_thickness",
+          "type": "INT",
+          "widget": {
+            "name": "stroke_base_thickness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "speed_to_width_factor",
+          "name": "speed_to_width_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "speed_to_width_factor"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "speed_to_brightness_factor",
+          "name": "speed_to_brightness_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "speed_to_brightness_factor"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "dense_optical_flow",
+          "name": "dense_optical_flow",
+          "type": "COMBO",
+          "widget": {
+            "name": "dense_optical_flow"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_smoothing",
+          "name": "temporal_smoothing",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_smoothing"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "model_complexity",
+          "name": "model_complexity",
+          "type": "COMBO",
+          "widget": {
+            "name": "model_complexity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "motion_representation",
           "name": "motion_representation",
           "type": "IMAGE",
           "links": [
-            2
-          ],
-          "slot_index": 0
+            25
+          ]
         },
         {
+          "localized_name": "stage_pipeline_grid",
           "name": "stage_pipeline_grid",
           "type": "IMAGE",
           "links": [
-            3
-          ],
-          "slot_index": 1
+            9
+          ]
         },
         {
+          "localized_name": "1_segmentation_mask",
           "name": "1_segmentation_mask",
           "type": "IMAGE",
           "links": [
-            4
-          ],
-          "slot_index": 2
+            21
+          ]
         },
         {
+          "localized_name": "2_pose_keypoints",
           "name": "2_pose_keypoints",
           "type": "IMAGE",
           "links": [
-            5
-          ],
-          "slot_index": 3
+            22
+          ]
         },
         {
+          "localized_name": "3_optical_flow",
           "name": "3_optical_flow",
           "type": "IMAGE",
           "links": [
-            6
-          ],
-          "slot_index": 4
+            23
+          ]
         },
         {
+          "localized_name": "4_bezier_splines",
           "name": "4_bezier_splines",
           "type": "IMAGE",
           "links": [
-            7
-          ],
-          "slot_index": 5
+            24
+          ]
         },
         {
+          "localized_name": "motion_video_file",
           "name": "motion_video_file",
           "type": "STRING",
-          "links": [],
-          "slot_index": 6
+          "links": []
         },
         {
+          "localized_name": "kinetic_motion_data",
           "name": "kinetic_motion_data",
           "type": "KINETIC_MOTION_DATA",
           "links": [
-            8
-          ],
-          "slot_index": 7
+            10
+          ]
         }
       ],
       "properties": {
@@ -134,15 +217,14 @@
         0.6,
         "full",
         24
-      ],
-      "title": "Google Kinetic Motion Curve Extractor"
+      ]
     },
     {
-      "id": 3,
+      "id": 60,
       "type": "KineticMotionToBrushRenderer",
       "pos": [
-        820,
-        120
+        840,
+        140
       ],
       "size": [
         380,
@@ -151,27 +233,182 @@
       "flags": {},
       "order": 2,
       "mode": 0,
+      "title": "Kinetic Motion-to-Brush Renderer",
       "inputs": [
         {
+          "localized_name": "motion_input",
           "name": "motion_input",
           "type": "*",
-          "link": 8
+          "link": 10
+        },
+        {
+          "localized_name": "trajectory_history_length",
+          "name": "trajectory_history_length",
+          "type": "INT",
+          "widget": {
+            "name": "trajectory_history_length"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_decay",
+          "name": "temporal_decay",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_decay"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "stroke_base_width",
+          "name": "stroke_base_width",
+          "type": "INT",
+          "widget": {
+            "name": "stroke_base_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_stroke_width",
+          "name": "min_stroke_width",
+          "type": "INT",
+          "widget": {
+            "name": "min_stroke_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_stroke_width",
+          "name": "max_stroke_width",
+          "type": "INT",
+          "widget": {
+            "name": "max_stroke_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "velocity_influence",
+          "name": "velocity_influence",
+          "type": "FLOAT",
+          "widget": {
+            "name": "velocity_influence"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "acceleration_influence",
+          "name": "acceleration_influence",
+          "type": "FLOAT",
+          "widget": {
+            "name": "acceleration_influence"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "brush_head_size",
+          "name": "brush_head_size",
+          "type": "INT",
+          "widget": {
+            "name": "brush_head_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "optical_flow_strength",
+          "name": "optical_flow_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "optical_flow_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "particle_density",
+          "name": "particle_density",
+          "type": "FLOAT",
+          "widget": {
+            "name": "particle_density"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "glow_strength",
+          "name": "glow_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "glow_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "anchor_weight_wrists",
+          "name": "anchor_weight_wrists",
+          "type": "FLOAT",
+          "widget": {
+            "name": "anchor_weight_wrists"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "anchor_weight_feet",
+          "name": "anchor_weight_feet",
+          "type": "FLOAT",
+          "widget": {
+            "name": "anchor_weight_feet"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "anchor_weight_elbows_knees",
+          "name": "anchor_weight_elbows_knees",
+          "type": "FLOAT",
+          "widget": {
+            "name": "anchor_weight_elbows_knees"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "anchor_weight_torso_head",
+          "name": "anchor_weight_torso_head",
+          "type": "FLOAT",
+          "widget": {
+            "name": "anchor_weight_torso_head"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "brush_color_mode",
+          "name": "brush_color_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "brush_color_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "brush_stroke_frames",
           "name": "brush_stroke_frames",
           "type": "IMAGE",
           "links": [
-            9
-          ],
-          "slot_index": 0
+            11
+          ]
         },
         {
+          "localized_name": "brush_stroke_video_file",
           "name": "brush_stroke_video_file",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
@@ -195,330 +432,588 @@
         0.8,
         "luminous_white",
         24
-      ],
-      "title": "Kinetic Motion-to-Brush Renderer"
+      ]
     },
     {
-      "id": 11,
-      "type": "KineticVideoCombine",
+      "id": 51,
+      "type": "GeminiVideoCombine",
       "pos": [
         1260,
         120
       ],
       "size": [
-        280,
-        340
+        270,
+        330
       ],
       "flags": {},
-      "order": 3,
+      "order": 6,
       "mode": 0,
+      "title": "Stage 1: Human Segmentation Mask",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 4
+          "link": 21
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         false,
         "Stage1_Segmentation"
-      ],
-      "title": "Stage 1: Human Segmentation Mask"
+      ]
     },
     {
-      "id": 12,
-      "type": "KineticVideoCombine",
+      "id": 52,
+      "type": "GeminiVideoCombine",
       "pos": [
-        1560,
+        1550,
         120
       ],
       "size": [
-        280,
-        340
+        270,
+        330
       ],
       "flags": {},
-      "order": 4,
+      "order": 7,
       "mode": 0,
+      "title": "Stage 2: MediaPipe 3D Pose Keypoints",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 5
+          "link": 22
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         false,
         "Stage2_PoseKeypoints"
-      ],
-      "title": "Stage 2: MediaPipe 3D Pose Keypoints"
+      ]
     },
     {
-      "id": 13,
-      "type": "KineticVideoCombine",
+      "id": 53,
+      "type": "GeminiVideoCombine",
       "pos": [
-        1860,
+        1840,
         120
       ],
       "size": [
-        280,
-        340
+        270,
+        330
       ],
       "flags": {},
-      "order": 5,
+      "order": 8,
       "mode": 0,
+      "title": "Stage 3: Dense Optical Flow Field",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 6
+          "link": 23
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         false,
         "Stage3_OpticalFlow"
-      ],
-      "title": "Stage 3: Dense Optical Flow Field"
+      ]
     },
     {
-      "id": 14,
-      "type": "KineticVideoCombine",
+      "id": 54,
+      "type": "GeminiVideoCombine",
       "pos": [
-        2160,
+        2130,
         120
       ],
       "size": [
-        280,
-        340
+        270,
+        330
       ],
       "flags": {},
-      "order": 6,
+      "order": 9,
       "mode": 0,
+      "title": "Stage 4: Converted Bezier Splines",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 7
+          "link": 24
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         false,
         "Stage4_BezierSplines"
-      ],
-      "title": "Stage 4: Converted Bezier Splines"
+      ]
     },
     {
-      "id": 15,
-      "type": "KineticVideoCombine",
+      "id": 55,
+      "type": "GeminiVideoCombine",
       "pos": [
-        2460,
+        2420,
         120
       ],
       "size": [
-        440,
-        340
+        420,
+        330
       ],
       "flags": {},
-      "order": 7,
+      "order": 10,
       "mode": 0,
+      "title": "4-Stage Annotated 2x2 HUD Grid",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 3
+          "link": 9
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         false,
         "StagePipelineHUD"
-      ],
-      "title": "4-Stage Annotated 2x2 HUD Grid"
+      ]
     },
     {
-      "id": 16,
-      "type": "KineticVideoCombine",
+      "id": 56,
+      "type": "GeminiVideoCombine",
       "pos": [
         1260,
-        500
+        480
       ],
       "size": [
-        360,
-        340
+        270,
+        330
       ],
       "flags": {},
-      "order": 8,
+      "order": 11,
       "mode": 0,
+      "title": "Clean Motion Extractor Output",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 2
+          "link": 25
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         false,
         "Motion_Extractor_Clean"
-      ],
-      "title": "Clean Motion Extractor Output"
+      ]
     },
     {
-      "id": 17,
-      "type": "KineticVideoCombine",
+      "id": 61,
+      "type": "GeminiVideoCombine",
       "pos": [
-        1660,
-        500
+        1550,
+        480
       ],
       "size": [
-        440,
-        340
+        420,
+        330
       ],
       "flags": {},
-      "order": 9,
+      "order": 16,
       "mode": 0,
+      "title": "Kinetic Brushstrokes Video (Video 1 Conditioning Input)",
       "inputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 9
+          "link": 11
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
         }
       ],
       "outputs": [
         {
+          "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "links": [],
-          "slot_index": 0
+          "links": []
         },
         {
+          "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "links": [],
-          "slot_index": 1
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "KineticVideoCombine"
+        "Node name for S&R": "GeminiVideoCombine"
       },
       "widgets_values": [
         24,
         "mp4",
         true,
-        "KineticBrushstrokes"
-      ],
-      "title": "Kinetic Brushstrokes Video Output"
+        "KineticBrushstrokes_Video1"
+      ]
     }
   ],
   "links": [
@@ -526,110 +1021,125 @@
       1,
       1,
       0,
-      2,
+      50,
       0,
-      "IMAGE"
+      "VIDEO"
     ],
     [
-      2,
-      2,
-      0,
-      16,
-      0,
-      "IMAGE"
-    ],
-    [
-      3,
-      2,
-      1,
-      15,
-      0,
-      "IMAGE"
-    ],
-    [
-      4,
-      2,
-      2,
-      11,
-      0,
-      "IMAGE"
-    ],
-    [
-      5,
-      2,
-      3,
-      12,
-      0,
-      "IMAGE"
-    ],
-    [
-      6,
-      2,
-      4,
-      13,
-      0,
-      "IMAGE"
-    ],
-    [
+      10,
+      50,
       7,
-      2,
-      5,
-      14,
-      0,
-      "IMAGE"
-    ],
-    [
-      8,
-      2,
-      7,
-      3,
+      60,
       0,
       "KINETIC_MOTION_DATA"
     ],
     [
-      9,
-      3,
+      21,
+      50,
+      2,
+      51,
       0,
-      17,
+      "IMAGE"
+    ],
+    [
+      22,
+      50,
+      3,
+      52,
+      0,
+      "IMAGE"
+    ],
+    [
+      23,
+      50,
+      4,
+      53,
+      0,
+      "IMAGE"
+    ],
+    [
+      24,
+      50,
+      5,
+      54,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      50,
+      1,
+      55,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      50,
+      0,
+      56,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      60,
+      0,
+      61,
       0,
       "IMAGE"
     ]
   ],
   "groups": [
     {
-      "title": "1. Source Video & Google Kinetic Motion Curve Extractor",
+      "id": 1,
+      "title": "1. Dancing Video Input & Google Kinetic Motion Curve Extractor",
       "bounding": [
         40,
         60,
         760,
-        600
+        800
       ],
       "color": "#3f51b5",
-      "font_size": 24
+      "font_size": 24,
+      "flags": {}
     },
     {
+      "id": 2,
       "title": "2. Kinetic Motion-to-Brush Renderer",
       "bounding": [
-        800,
+        820,
         60,
         420,
-        600
+        800
       ],
-      "color": "#e91e63",
-      "font_size": 24
+      "color": "#ff9800",
+      "font_size": 24,
+      "flags": {}
     },
     {
+      "id": 3,
       "title": "3. All Video Previews Suite (Stages 1-4 | 2x2 HUD Grid | Extractor Motion | Rendered Brushstrokes)",
       "bounding": [
         1240,
         60,
-        1680,
+        1620,
         800
       ],
-      "color": "#009688",
-      "font_size": 24
+      "color": "#9c27b0",
+      "font_size": 24,
+      "flags": {}
     }
   ],
   "config": {},
-  "extra": {}
+  "extra": {
+    "ds": {
+      "scale": 0.52,
+      "offset": [
+        25,
+        25
+      ]
+    }
+  },
+  "version": 0.4
 }
