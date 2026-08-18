@@ -3097,43 +3097,43 @@
         {
           "localized_name": "original_video",
           "name": "original_video",
-          "type": "IMAGE",
+          "type": "*",
           "link": 51
         },
         {
           "localized_name": "human_segmentation",
           "name": "human_segmentation",
-          "type": "IMAGE",
+          "type": "*",
           "link": 52
         },
         {
           "localized_name": "dense_optical_flow",
           "name": "dense_optical_flow",
-          "type": "IMAGE",
+          "type": "*",
           "link": 53
         },
         {
           "localized_name": "converted_bezier",
           "name": "converted_bezier",
-          "type": "IMAGE",
+          "type": "*",
           "link": 54
         },
         {
           "localized_name": "clean_motion_extractor",
           "name": "clean_motion_extractor",
-          "type": "IMAGE",
+          "type": "*",
           "link": 55
         },
         {
           "localized_name": "fuser_brushstrokes",
           "name": "fuser_brushstrokes",
-          "type": "IMAGE",
+          "type": "*",
           "link": 56
         },
         {
           "localized_name": "gemini_omni_artwork",
           "name": "gemini_omni_artwork",
-          "type": "IMAGE",
+          "type": "*",
           "link": 57
         },
         {

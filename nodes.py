@@ -3007,8 +3007,8 @@ class KineticDualComparisonViewer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "stage6_fused_brushstrokes": ("IMAGE", {"tooltip": "Stage 6 Fused Kinetic + TAPNet Brushstrokes video"}),
-                "final_stylized_artwork": ("IMAGE", {"tooltip": "Final Stylized Artwork video from Gemini Omni"}),
+                "stage6_fused_brushstrokes": (ANY_TYPE, {"tooltip": "Stage 6 Fused Kinetic + TAPNet Brushstrokes video"}),
+                "final_stylized_artwork": (ANY_TYPE, {"tooltip": "Final Stylized Artwork video from Gemini Omni"}),
             },
             "optional": {
                 "layout": (["side_by_side_horizontal", "stacked_vertical"], {"default": "side_by_side_horizontal"}),
@@ -3029,10 +3029,38 @@ class KineticDualComparisonViewer:
     CATEGORY = "kinetic_motion"
     DESCRIPTION = "Combines Stage 6 Fused Brushstrokes and Final Stylized Video into a unified side-by-side comparison video."
 
+    def _extract_frames_from_input(self, inp):
+        if inp is None:
+            return []
+        v_path = get_video_file_path(inp)
+        if v_path and os.path.exists(v_path):
+            frames = []
+            cap = cv2.VideoCapture(v_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+            return frames
+        if isinstance(inp, torch.Tensor):
+            t = inp
+            if len(t.shape) == 3: t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            return [np_frames[i] for i in range(np_frames.shape[0])]
+        if isinstance(inp, list):
+            res = []
+            for item in inp: res.extend(self._extract_frames_from_input(item))
+            return res
+        if isinstance(inp, dict):
+            if "frames_rgb" in inp: return inp["frames_rgb"]
+            if "images" in inp: return self._extract_frames_from_input(inp["images"])
+            if "video_path" in inp: return self._extract_frames_from_input(inp["video_path"])
+        return []
+
     def create_comparison(
         self,
-        stage6_fused_brushstrokes: torch.Tensor,
-        final_stylized_artwork: torch.Tensor,
+        stage6_fused_brushstrokes: Any,
+        final_stylized_artwork: Any,
         layout: str = "side_by_side_horizontal",
         show_labels: str = "enable",
         label_left: str = "Stage 6: Fused Brushstrokes",
@@ -3042,12 +3070,14 @@ class KineticDualComparisonViewer:
         save_output: bool = True,
         filename_prefix: str = "Dual_Kinetic_Comparison"
     ):
-        if stage6_fused_brushstrokes is None or final_stylized_artwork is None:
+        s1 = self._extract_frames_from_input(stage6_fused_brushstrokes)
+        s2 = self._extract_frames_from_input(final_stylized_artwork)
+        if not s1 or not s2:
             raise ValueError("[KineticDualComparisonViewer] Both stage6 and final stylized inputs are required.")
 
-        num_frames = min(stage6_fused_brushstrokes.shape[0], final_stylized_artwork.shape[0])
-        h1, w1 = stage6_fused_brushstrokes.shape[1], stage6_fused_brushstrokes.shape[2]
-        h2, w2 = final_stylized_artwork.shape[1], final_stylized_artwork.shape[2]
+        num_frames = min(len(s1), len(s2))
+        h1, w1 = s1[0].shape[:2]
+        h2, w2 = s2[0].shape[:2]
 
         target_h = max(h1, h2)
         target_w = int(w1 * (target_h / h1))
@@ -3057,8 +3087,8 @@ class KineticDualComparisonViewer:
         pil_frames = []
 
         for fi in range(num_frames):
-            f1_np = (stage6_fused_brushstrokes[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
-            f2_np = (final_stylized_artwork[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            f1_np = s1[fi]
+            f2_np = s2[fi]
 
             f1_resized = cv2.resize(f1_np, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
             f2_resized = cv2.resize(f2_np, (target_w2, target_h), interpolation=cv2.INTER_LANCZOS4)
@@ -3155,13 +3185,13 @@ class KineticSevenStagePipelineViewer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "original_video": ("IMAGE", {"tooltip": "1. Original source dancer/motion video"}),
-                "human_segmentation": ("IMAGE", {"tooltip": "2. Stage 1 Segmentation mask"}),
-                "dense_optical_flow": ("IMAGE", {"tooltip": "3. Stage 3 Dense optical flow vector field"}),
-                "converted_bezier": ("IMAGE", {"tooltip": "4. Stage 4 Bezier spline trajectory curves"}),
-                "clean_motion_extractor": ("IMAGE", {"tooltip": "5. Stage 5 Macro skeletal kinetic motion curves"}),
-                "fuser_brushstrokes": ("IMAGE", {"tooltip": "6. Stage 6 Fused TAPNet + Kinetic physical brushstrokes"}),
-                "gemini_omni_artwork": ("IMAGE", {"tooltip": "7. Final Stylized Masterpiece Video from Gemini Omni"}),
+                "original_video": (ANY_TYPE, {"tooltip": "1. Original source dancer/motion video (accepts IMAGE tensor or VIDEO path)"}),
+                "human_segmentation": (ANY_TYPE, {"tooltip": "2. Stage 1 Segmentation mask"}),
+                "dense_optical_flow": (ANY_TYPE, {"tooltip": "3. Stage 3 Dense optical flow vector field"}),
+                "converted_bezier": (ANY_TYPE, {"tooltip": "4. Stage 4 Bezier spline trajectory curves"}),
+                "clean_motion_extractor": (ANY_TYPE, {"tooltip": "5. Stage 5 Macro skeletal kinetic motion curves"}),
+                "fuser_brushstrokes": (ANY_TYPE, {"tooltip": "6. Stage 6 Fused TAPNet + Kinetic physical brushstrokes"}),
+                "gemini_omni_artwork": (ANY_TYPE, {"tooltip": "7. Final Stylized Masterpiece Video from Gemini Omni"}),
             },
             "optional": {
                 "layout": (["grid_2x4_omni_featured", "grid_2x4_equal", "strip_horizontal"], {"default": "grid_2x4_omni_featured"}),
@@ -3180,15 +3210,57 @@ class KineticSevenStagePipelineViewer:
     CATEGORY = "kinetic_motion"
     DESCRIPTION = "Combines all 7 stages of the Kinetic Motion & Gemini pipeline into a unified multi-panel synchronization video."
 
+    def _extract_frames_from_input(self, inp):
+        if inp is None:
+            return []
+        
+        # 1. Video file path string
+        v_path = get_video_file_path(inp)
+        if v_path and os.path.exists(v_path):
+            frames = []
+            cap = cv2.VideoCapture(v_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+            return frames
+        
+        # 2. Torch Tensor
+        if isinstance(inp, torch.Tensor):
+            t = inp
+            if len(t.shape) == 3:
+                t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            return [np_frames[i] for i in range(np_frames.shape[0])]
+            
+        # 3. List of items
+        if isinstance(inp, list):
+            res = []
+            for item in inp:
+                res.extend(self._extract_frames_from_input(item))
+            return res
+            
+        # 4. Dict with frames or path
+        if isinstance(inp, dict):
+            if "frames_rgb" in inp:
+                return inp["frames_rgb"]
+            if "images" in inp:
+                return self._extract_frames_from_input(inp["images"])
+            if "video_path" in inp:
+                return self._extract_frames_from_input(inp["video_path"])
+                
+        return []
+
     def create_seven_stage_preview(
         self,
-        original_video: torch.Tensor,
-        human_segmentation: torch.Tensor,
-        dense_optical_flow: torch.Tensor,
-        converted_bezier: torch.Tensor,
-        clean_motion_extractor: torch.Tensor,
-        fuser_brushstrokes: torch.Tensor,
-        gemini_omni_artwork: torch.Tensor,
+        original_video: Any,
+        human_segmentation: Any,
+        dense_optical_flow: Any,
+        converted_bezier: Any,
+        clean_motion_extractor: Any,
+        fuser_brushstrokes: Any,
+        gemini_omni_artwork: Any,
         layout: str = "grid_2x4_omni_featured",
         show_hud_labels: str = "enable",
         frame_rate: int = 24,
@@ -3226,9 +3298,11 @@ class KineticSevenStagePipelineViewer:
             (255, 200, 40)   # Gold
         ]
 
-        num_frames = min(t.shape[0] for t in raw_inputs if t is not None and len(t.shape) >= 3)
-        if num_frames == 0:
-            raise ValueError("[KineticSevenStagePipelineViewer] No frames found in input tensors.")
+        parsed_streams = [self._extract_frames_from_input(inp) for inp in raw_inputs]
+        valid_counts = [len(s) for s in parsed_streams if len(s) > 0]
+        if not valid_counts:
+            raise ValueError("[KineticSevenStagePipelineViewer] No frames found across the 7 inputs.")
+        num_frames = min(valid_counts)
 
         cell_w, cell_h = 480, 270 # Standard 16:9 cell
 
@@ -3242,8 +3316,8 @@ class KineticSevenStagePipelineViewer:
 
                 # Top Row: Stages 1, 2, 3, 4
                 for i in range(4):
-                    inp = raw_inputs[i]
-                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    stream = parsed_streams[i]
+                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
                     f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
                     if show_hud_labels == "enable":
                         cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
@@ -3254,8 +3328,8 @@ class KineticSevenStagePipelineViewer:
                 # Bottom Row: Stages 5, 6
                 for i in [4, 5]:
                     c_idx = i - 4
-                    inp = raw_inputs[i]
-                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    stream = parsed_streams[i]
+                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
                     f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
                     if show_hud_labels == "enable":
                         cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
@@ -3264,8 +3338,8 @@ class KineticSevenStagePipelineViewer:
                     canvas[cell_h:canvas_h, c_idx*cell_w:(c_idx+1)*cell_w] = f_r
 
                 # Bottom-Right Featured Wide: Stage 7 (Gemini Omni Artwork across 2 columns)
-                inp7 = raw_inputs[6]
-                f7_np = (inp7[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                stream7 = parsed_streams[6]
+                f7_np = stream7[fi] if fi < len(stream7) else np.zeros((cell_h, cell_w * 2, 3), dtype=np.uint8)
                 f7_r = cv2.resize(f7_np, (cell_w * 2, cell_h), interpolation=cv2.INTER_AREA)
                 if show_hud_labels == "enable":
                     cv2.rectangle(f7_r, (0, 0), (cell_w * 2, 24), (12, 14, 18), -1)
@@ -3280,8 +3354,8 @@ class KineticSevenStagePipelineViewer:
                 for i in range(7):
                     row = i // 4
                     col = i % 4
-                    inp = raw_inputs[i]
-                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    stream = parsed_streams[i]
+                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
                     f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
                     if show_hud_labels == "enable":
                         cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
@@ -3302,8 +3376,8 @@ class KineticSevenStagePipelineViewer:
                 canvas_w, canvas_h = cell_w * 7, cell_h
                 canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
                 for i in range(7):
-                    inp = raw_inputs[i]
-                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    stream = parsed_streams[i]
+                    f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
                     f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
                     if show_hud_labels == "enable":
                         cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
