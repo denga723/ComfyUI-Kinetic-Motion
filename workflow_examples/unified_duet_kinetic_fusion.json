@@ -243,7 +243,7 @@
       ],
       "size": [
         420,
-        480
+        520
       ],
       "flags": {},
       "order": 2,
@@ -262,11 +262,20 @@
           "link": 3
         },
         {
-          "localized_name": "query_point_count",
-          "name": "query_point_count",
+          "localized_name": "num_points",
+          "name": "num_points",
           "type": "INT",
           "widget": {
-            "name": "query_point_count"
+            "name": "num_points"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "grid_sampling",
+          "name": "grid_sampling",
+          "type": "COMBO",
+          "widget": {
+            "name": "grid_sampling"
           },
           "link": null
         },
@@ -289,11 +298,29 @@
           "link": null
         },
         {
+          "localized_name": "trail_thickness",
+          "name": "trail_thickness",
+          "type": "INT",
+          "widget": {
+            "name": "trail_thickness"
+          },
+          "link": null
+        },
+        {
           "localized_name": "color_scheme",
           "name": "color_scheme",
           "type": "COMBO",
           "widget": {
             "name": "color_scheme"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "occlusion_threshold",
+          "name": "occlusion_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "occlusion_threshold"
           },
           "link": null
         },
@@ -346,9 +373,12 @@
       },
       "widgets_values": [
         256,
+        "dancer_silhouette",
         20,
         4,
+        3,
         "track_spectrum",
+        0.4,
         24,
         "720p (Fastest)"
       ],
@@ -363,7 +393,7 @@
       ],
       "size": [
         420,
-        520
+        540
       ],
       "flags": {},
       "order": 3,
@@ -1847,50 +1877,50 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "1_original_video",
-          "name": "1_original_video",
+          "localized_name": "original_video",
+          "name": "original_video",
           "type": "*",
           "link": 26
         },
         {
-          "localized_name": "2_segmentation_mask",
-          "name": "2_segmentation_mask",
+          "localized_name": "human_segmentation",
+          "name": "human_segmentation",
           "type": "*",
           "link": 27
         },
         {
-          "localized_name": "3_optical_flow",
-          "name": "3_optical_flow",
+          "localized_name": "dense_optical_flow",
+          "name": "dense_optical_flow",
           "type": "*",
           "link": 28
         },
         {
-          "localized_name": "4_bezier_splines",
-          "name": "4_bezier_splines",
+          "localized_name": "converted_bezier",
+          "name": "converted_bezier",
           "type": "*",
           "link": 29
         },
         {
-          "localized_name": "5_clean_motion",
-          "name": "5_clean_motion",
+          "localized_name": "clean_motion_extractor",
+          "name": "clean_motion_extractor",
           "type": "*",
           "link": 30
         },
         {
-          "localized_name": "6_tapnet_point_video",
-          "name": "6_tapnet_point_video",
+          "localized_name": "tapnet_point_tracker",
+          "name": "tapnet_point_tracker",
           "type": "*",
           "link": 31
         },
         {
-          "localized_name": "7_fused_brushstrokes",
-          "name": "7_fused_brushstrokes",
+          "localized_name": "fuser_brushstrokes",
+          "name": "fuser_brushstrokes",
           "type": "*",
           "link": 32
         },
         {
-          "localized_name": "8_gemini_omni_final_art",
-          "name": "8_gemini_omni_final_art",
+          "localized_name": "gemini_omni_artwork",
+          "name": "gemini_omni_artwork",
           "type": "*",
           "link": 33
         },

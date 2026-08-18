@@ -2364,6 +2364,31 @@ class TAPNetKineticPointTracker:
         fps: int = 24,
         max_resolution: str = "720p (Fastest)"
     ):
+        try:
+            num_points = int(num_points)
+        except Exception:
+            num_points = 128
+        try:
+            trail_history = int(trail_history)
+        except Exception:
+            trail_history = 24
+        try:
+            point_radius = int(point_radius)
+        except Exception:
+            point_radius = 5
+        try:
+            trail_thickness = int(trail_thickness)
+        except Exception:
+            trail_thickness = 3
+        try:
+            occlusion_threshold = float(occlusion_threshold)
+        except Exception:
+            occlusion_threshold = 0.40
+        try:
+            fps = int(fps)
+        except Exception:
+            fps = 24
+
         # 1. Read input frames (reuse already processed frames if available)
         frames = []
         if isinstance(mask_or_images, dict) and "frames_rgb" in mask_or_images and len(mask_or_images["frames_rgb"]) > 0:
