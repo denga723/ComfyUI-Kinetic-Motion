@@ -3134,6 +3134,241 @@ class KineticDualComparisonViewer:
         }
 
 
+class KineticSevenStagePipelineViewer:
+    """
+    Seven-Stage Kinetic Pipeline Multi-Panel Comparison & Synchronizer.
+    Combines all 7 stages:
+      1. Original Video
+      2. Human Segmentation Mask
+      3. Dense Optical Flow Field
+      4. Converted Bezier Splines
+      5. Clean Motion Extractor (Macro Skeletal Curves)
+      6. TAPNet Kinetic Brush Fusion Renderer
+      7. Gemini Omni Final Artwork
+    into a unified multi-panel HUD video with live inline preview.
+    """
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "original_video": ("IMAGE", {"tooltip": "1. Original source dancer/motion video"}),
+                "human_segmentation": ("IMAGE", {"tooltip": "2. Stage 1 Segmentation mask"}),
+                "dense_optical_flow": ("IMAGE", {"tooltip": "3. Stage 3 Dense optical flow vector field"}),
+                "converted_bezier": ("IMAGE", {"tooltip": "4. Stage 4 Bezier spline trajectory curves"}),
+                "clean_motion_extractor": ("IMAGE", {"tooltip": "5. Stage 5 Macro skeletal kinetic motion curves"}),
+                "fuser_brushstrokes": ("IMAGE", {"tooltip": "6. Stage 6 Fused TAPNet + Kinetic physical brushstrokes"}),
+                "gemini_omni_artwork": ("IMAGE", {"tooltip": "7. Final Stylized Masterpiece Video from Gemini Omni"}),
+            },
+            "optional": {
+                "layout": (["grid_2x4_omni_featured", "grid_2x4_equal", "strip_horizontal"], {"default": "grid_2x4_omni_featured"}),
+                "show_hud_labels": (["enable", "disable"], {"default": "enable"}),
+                "frame_rate": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "format": (["mp4", "animated_webp", "gif"], {"default": "mp4"}),
+                "save_output": ("BOOLEAN", {"default": True}),
+                "filename_prefix": ("STRING", {"default": "Seven_Stage_Kinetic_Pipeline"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("seven_stage_preview", "video_path")
+    OUTPUT_NODE = True
+    FUNCTION = "create_seven_stage_preview"
+    CATEGORY = "kinetic_motion"
+    DESCRIPTION = "Combines all 7 stages of the Kinetic Motion & Gemini pipeline into a unified multi-panel synchronization video."
+
+    def create_seven_stage_preview(
+        self,
+        original_video: torch.Tensor,
+        human_segmentation: torch.Tensor,
+        dense_optical_flow: torch.Tensor,
+        converted_bezier: torch.Tensor,
+        clean_motion_extractor: torch.Tensor,
+        fuser_brushstrokes: torch.Tensor,
+        gemini_omni_artwork: torch.Tensor,
+        layout: str = "grid_2x4_omni_featured",
+        show_hud_labels: str = "enable",
+        frame_rate: int = 24,
+        format: str = "mp4",
+        save_output: bool = True,
+        filename_prefix: str = "Seven_Stage_Kinetic_Pipeline"
+    ):
+        raw_inputs = [
+            original_video,
+            human_segmentation,
+            dense_optical_flow,
+            converted_bezier,
+            clean_motion_extractor,
+            fuser_brushstrokes,
+            gemini_omni_artwork
+        ]
+
+        stage_labels = [
+            "1. Original Video",
+            "2. Human Segmentation",
+            "3. Dense Optical Flow",
+            "4. Converted Bezier",
+            "5. Clean Motion Extractor",
+            "6. TAPNet Kinetic Fuser",
+            "7. Gemini Omni Final Art"
+        ]
+
+        stage_colors = [
+            (220, 220, 220), # Gray/White
+            (0, 240, 255),   # Cyan
+            (255, 60, 180),  # Magenta
+            (80, 240, 120),  # Emerald
+            (0, 230, 255),   # Bright Cyan
+            (0, 255, 160),   # Neon Green
+            (255, 200, 40)   # Gold
+        ]
+
+        num_frames = min(t.shape[0] for t in raw_inputs if t is not None and len(t.shape) >= 3)
+        if num_frames == 0:
+            raise ValueError("[KineticSevenStagePipelineViewer] No frames found in input tensors.")
+
+        cell_w, cell_h = 480, 270 # Standard 16:9 cell
+
+        comp_frames = []
+        pil_frames = []
+
+        for fi in range(num_frames):
+            if layout == "grid_2x4_omni_featured":
+                canvas_w, canvas_h = cell_w * 4, cell_h * 2
+                canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+
+                # Top Row: Stages 1, 2, 3, 4
+                for i in range(4):
+                    inp = raw_inputs[i]
+                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
+                    if show_hud_labels == "enable":
+                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                    canvas[0:cell_h, i*cell_w:(i+1)*cell_w] = f_r
+
+                # Bottom Row: Stages 5, 6
+                for i in [4, 5]:
+                    c_idx = i - 4
+                    inp = raw_inputs[i]
+                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
+                    if show_hud_labels == "enable":
+                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                    canvas[cell_h:canvas_h, c_idx*cell_w:(c_idx+1)*cell_w] = f_r
+
+                # Bottom-Right Featured Wide: Stage 7 (Gemini Omni Artwork across 2 columns)
+                inp7 = raw_inputs[6]
+                f7_np = (inp7[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                f7_r = cv2.resize(f7_np, (cell_w * 2, cell_h), interpolation=cv2.INTER_AREA)
+                if show_hud_labels == "enable":
+                    cv2.rectangle(f7_r, (0, 0), (cell_w * 2, 24), (12, 14, 18), -1)
+                    cv2.line(f7_r, (0, 24), (cell_w * 2, 24), stage_colors[6], 2)
+                    cv2.putText(f7_r, stage_labels[6] + " (Omni Masterpiece)", (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 220, 60), 1, cv2.LINE_AA)
+                canvas[cell_h:canvas_h, 2*cell_w:4*cell_w] = f7_r
+
+            elif layout == "grid_2x4_equal":
+                canvas_w, canvas_h = cell_w * 4, cell_h * 2
+                canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+
+                for i in range(7):
+                    row = i // 4
+                    col = i % 4
+                    inp = raw_inputs[i]
+                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
+                    if show_hud_labels == "enable":
+                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                    canvas[row*cell_h:(row+1)*cell_h, col*cell_w:(col+1)*cell_w] = f_r
+
+                # Slot 8: Telemetry Badge
+                slot8 = np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+                cv2.rectangle(slot8, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                cv2.putText(slot8, "8. Pipeline Telemetry", (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 200, 220), 1, cv2.LINE_AA)
+                cv2.putText(slot8, "7-STAGE KINETIC PIPELINE", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 240, 255), 2, cv2.LINE_AA)
+                cv2.putText(slot8, f"Frame: {fi+1}/{num_frames} @ {frame_rate}fps", (20, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 220, 240), 1, cv2.LINE_AA)
+                cv2.putText(slot8, "MediaPipe + TAPNet + Gemini", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 140), 1, cv2.LINE_AA)
+                canvas[cell_h:canvas_h, 3*cell_w:4*cell_w] = slot8
+
+            else: # strip_horizontal
+                canvas_w, canvas_h = cell_w * 7, cell_h
+                canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+                for i in range(7):
+                    inp = raw_inputs[i]
+                    f_np = (inp[fi].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
+                    if show_hud_labels == "enable":
+                        cv2.rectangle(f_r, (0, 0), (cell_w, 24), (12, 14, 18), -1)
+                        cv2.line(f_r, (0, 24), (cell_w, 24), stage_colors[i], 1)
+                        cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                    canvas[0:cell_h, i*cell_w:(i+1)*cell_w] = f_r
+
+            comp_frames.append(canvas.astype(np.float32) / 255.0)
+            if format in ["animated_webp", "gif"] or True: # Keep small pil frames for fast preview
+                pil_frames.append(Image.fromarray(canvas))
+
+        out_tensor = torch.from_numpy(np.array(comp_frames, dtype=np.float32))
+
+        # Save output
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, self.output_dir if save_output else self.temp_dir, canvas_w, canvas_h
+        )
+
+        saved_path = ""
+        ui_results = []
+        type_str = "output" if save_output else "temp"
+
+        if format == "mp4":
+            mp4_filename = f"{filename}_{counter:05d}.mp4"
+            saved_path = os.path.join(full_output_folder, mp4_filename)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out_writer = cv2.VideoWriter(saved_path, fourcc, float(frame_rate), (canvas_w, canvas_h))
+            for f in comp_frames:
+                bgr_f = cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR)
+                out_writer.write(bgr_f)
+            out_writer.release()
+            
+            # Generate WebP thumbnail/preview for inline ComfyUI playback
+            preview_webp_name = f"{filename}_{counter:05d}_preview.webp"
+            preview_path = os.path.join(full_output_folder, preview_webp_name)
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            # Subsample preview if long to keep inline preview lightning fast
+            step = max(1, len(pil_frames) // 120) if len(pil_frames) > 120 else 1
+            prev_sub = [pil_frames[idx].resize((canvas_w // 2, canvas_h // 2), Image.Resampling.LANCZOS) for idx in range(0, len(pil_frames), step)]
+            prev_sub[0].save(preview_path, save_all=True, append_images=prev_sub[1:], duration=duration_ms * step, loop=0, quality=80)
+            ui_results.append({"filename": preview_webp_name, "subfolder": subfolder, "type": type_str, "format": "image/webp"})
+
+        elif format == "animated_webp":
+            webp_filename = f"{filename}_{counter:05d}.webp"
+            saved_path = os.path.join(full_output_folder, webp_filename)
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            pil_frames[0].save(saved_path, save_all=True, append_images=pil_frames[1:], duration=duration_ms, loop=0, quality=85)
+            ui_results.append({"filename": webp_filename, "subfolder": subfolder, "type": type_str, "format": "image/webp"})
+
+        elif format == "gif":
+            gif_filename = f"{filename}_{counter:05d}.gif"
+            saved_path = os.path.join(full_output_folder, gif_filename)
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            step = max(1, len(pil_frames) // 120) if len(pil_frames) > 120 else 1
+            prev_sub = [pil_frames[idx].resize((canvas_w // 2, canvas_h // 2), Image.Resampling.LANCZOS) for idx in range(0, len(pil_frames), step)]
+            prev_sub[0].save(saved_path, save_all=True, append_images=prev_sub[1:], duration=duration_ms * step, loop=0, optimize=True)
+            ui_results.append({"filename": gif_filename, "subfolder": subfolder, "type": type_str, "format": "image/gif"})
+
+        print(f"[KineticSevenStagePipelineViewer] Rendered 7-stage pipeline synchronization ({canvas_w}x{canvas_h}, {num_frames} frames) to {saved_path}")
+        return {
+            "ui": {"images": ui_results},
+            "result": (out_tensor, saved_path)
+        }
+
+
 NODE_CLASS_MAPPINGS = {
     "GeminiProModel": GeminiProModel,
     "GeminiOmniModel": GeminiOmniModel,
@@ -3149,7 +3384,9 @@ NODE_CLASS_MAPPINGS = {
     "KineticTAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer,
     "TAPNetBrushFusionRenderer": KineticTAPNetBrushFusionRenderer,
     "KineticDualComparisonViewer": KineticDualComparisonViewer,
-    "DualVideoComparisonViewer": KineticDualComparisonViewer
+    "DualVideoComparisonViewer": KineticDualComparisonViewer,
+    "KineticSevenStagePipelineViewer": KineticSevenStagePipelineViewer,
+    "SevenStagePipelineViewer": KineticSevenStagePipelineViewer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -3167,5 +3404,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KineticTAPNetBrushFusionRenderer": "Kinetic + TAPNet Brush Fusion Renderer",
     "TAPNetBrushFusionRenderer": "TAPNet Brush Fusion Renderer",
     "KineticDualComparisonViewer": "Kinetic Dual Comparison Viewer (Stage 6 + Final Art)",
-    "DualVideoComparisonViewer": "Dual Video Comparison Viewer"
+    "DualVideoComparisonViewer": "Dual Video Comparison Viewer",
+    "KineticSevenStagePipelineViewer": "Kinetic Seven-Stage Pipeline Viewer (All 7 Stages)",
+    "SevenStagePipelineViewer": "Seven-Stage Pipeline Viewer"
 }
