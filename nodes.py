@@ -3763,37 +3763,105 @@ class DualPersonTAPNetTracker:
         if not raw_frames:
             raise ValueError("[DualPersonTAPNetTracker] No video frames found.")
 
-        num_frames = len(raw_frames)
-        h, w = raw_frames[0].shape[:2]
+        # Resolution scaling
+        h_orig, w_orig = raw_frames[0].shape[:2]
+        res_limits = {"540p (Draft)": 540, "720p (Fastest)": 720, "1080p (Standard)": 1080, "Original (No Limit)": 99999}
+        max_h = res_limits.get(max_resolution, 720)
+        scale = min(1.0, max_h / float(h_orig))
+        if scale < 0.99:
+            w_p = int(w_orig * scale)
+            h_p = int(h_orig * scale)
+            w_p = w_p if w_p % 2 == 0 else w_p - 1
+            h_p = h_p if h_p % 2 == 0 else h_p - 1
+            proc_frames = [cv2.resize(f, (w_p, h_p), interpolation=cv2.INTER_AREA) for f in raw_frames]
+        else:
+            w_p, h_p = w_orig, h_orig
+            proc_frames = raw_frames
+
+        num_frames = len(proc_frames)
+
+        # Helper to get clean uint8 2D mask matching (h_p, w_p)
+        def _get_mask_at(frames_list, idx, fallback_thresh_high=True):
+            if frames_list and len(frames_list) > 0:
+                raw_m = frames_list[min(idx, len(frames_list) - 1)]
+                if len(raw_m.shape) == 3:
+                    m_gray = cv2.cvtColor(raw_m, cv2.COLOR_RGB2GRAY)
+                else:
+                    m_gray = raw_m
+                if m_gray.shape[:2] != (h_p, w_p):
+                    m_gray = cv2.resize(m_gray, (w_p, h_p), interpolation=cv2.INTER_NEAREST)
+                return ((m_gray > 10).astype(np.uint8)) * 255
+            else:
+                curr_gray = cv2.cvtColor(proc_frames[min(idx, num_frames - 1)], cv2.COLOR_RGB2GRAY)
+                if fallback_thresh_high:
+                    return ((curr_gray > 110).astype(np.uint8)) * 255
+                else:
+                    return (((curr_gray <= 110) & (curr_gray > 18)).astype(np.uint8)) * 255
 
         # Seed initial points inside masks
-        m1_init = cv2.cvtColor(m1_frames[0], cv2.COLOR_RGB2GRAY) if m1_frames else (cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY) > 110).astype(np.uint8)*255
-        m2_init = cv2.cvtColor(m2_frames[0], cv2.COLOR_RGB2GRAY) if m2_frames else (cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY) <= 110).astype(np.uint8)*255
+        gray_0 = cv2.cvtColor(proc_frames[0], cv2.COLOR_RGB2GRAY)
+        m1_init = _get_mask_at(m1_frames, 0, fallback_thresh_high=True)
+        m2_init = _get_mask_at(m2_frames, 0, fallback_thresh_high=False)
 
-        pts1_init = cv2.goodFeaturesToTrack(cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY), maxCorners=num_points_per_character, qualityLevel=0.01, minDistance=8, mask=m1_init)
-        pts2_init = cv2.goodFeaturesToTrack(cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY), maxCorners=num_points_per_character, qualityLevel=0.01, minDistance=8, mask=m2_init)
+        pts1_init = None
+        if np.any(m1_init > 0):
+            pts1_init = cv2.goodFeaturesToTrack(gray_0, maxCorners=num_points_per_character, qualityLevel=0.01, minDistance=8, mask=m1_init)
+        if pts1_init is None or len(pts1_init) == 0:
+            y_i, x_i = np.where(m1_init > 0)
+            if len(y_i) > 0:
+                sample_n = min(num_points_per_character, len(y_i))
+                choice = np.random.choice(len(y_i), sample_n, replace=False)
+                p1_curr = np.stack([x_i[choice], y_i[choice]], axis=-1).astype(np.float32).reshape(-1, 1, 2)
+            else:
+                p1_curr = np.zeros((0, 1, 2), dtype=np.float32)
+        else:
+            p1_curr = pts1_init
 
-        p1_curr = pts1_init if pts1_init is not None else np.zeros((0, 1, 2), dtype=np.float32)
-        p2_curr = pts2_init if pts2_init is not None else np.zeros((0, 1, 2), dtype=np.float32)
+        pts2_init = None
+        if np.any(m2_init > 0):
+            pts2_init = cv2.goodFeaturesToTrack(gray_0, maxCorners=num_points_per_character, qualityLevel=0.01, minDistance=8, mask=m2_init)
+        if pts2_init is None or len(pts2_init) == 0:
+            y_i, x_i = np.where(m2_init > 0)
+            if len(y_i) > 0:
+                sample_n = min(num_points_per_character, len(y_i))
+                choice = np.random.choice(len(y_i), sample_n, replace=False)
+                p2_curr = np.stack([x_i[choice], y_i[choice]], axis=-1).astype(np.float32).reshape(-1, 1, 2)
+            else:
+                p2_curr = np.zeros((0, 1, 2), dtype=np.float32)
+        else:
+            p2_curr = pts2_init
 
-        prev_gray = cv2.cvtColor(raw_frames[0], cv2.COLOR_RGB2GRAY)
-        
+        prev_gray = gray_0
         tracks1 = [p1_curr.reshape(-1, 2)]
         tracks2 = [p2_curr.reshape(-1, 2)]
 
         for fi in range(1, num_frames):
-            gray = cv2.cvtColor(raw_frames[fi], cv2.COLOR_RGB2GRAY)
+            gray = cv2.cvtColor(proc_frames[fi], cv2.COLOR_RGB2GRAY)
+            m1_curr = _get_mask_at(m1_frames, fi, fallback_thresh_high=True)
+            m2_curr = _get_mask_at(m2_frames, fi, fallback_thresh_high=False)
             
             # Track Char 1
             if len(p1_curr) > 0:
                 p1_next, st1, err1 = cv2.calcOpticalFlowPyrLK(prev_gray, gray, p1_curr, None, winSize=(15, 15), maxLevel=2)
-                p1_curr = p1_next[st1 == 1].reshape(-1, 1, 2)
+                p1_curr = p1_next[st1.flatten() == 1].reshape(-1, 1, 2)
+            
+            # Re-seed Char 1 if points dwindle
+            if len(p1_curr) < num_points_per_character // 2 and np.any(m1_curr > 0):
+                new_pts1 = cv2.goodFeaturesToTrack(gray, maxCorners=num_points_per_character - len(p1_curr), qualityLevel=0.01, minDistance=8, mask=m1_curr)
+                if new_pts1 is not None and len(new_pts1) > 0:
+                    p1_curr = np.vstack([p1_curr, new_pts1]) if len(p1_curr) > 0 else new_pts1
             tracks1.append(p1_curr.reshape(-1, 2))
 
             # Track Char 2
             if len(p2_curr) > 0:
                 p2_next, st2, err2 = cv2.calcOpticalFlowPyrLK(prev_gray, gray, p2_curr, None, winSize=(15, 15), maxLevel=2)
-                p2_curr = p2_next[st2 == 1].reshape(-1, 1, 2)
+                p2_curr = p2_next[st2.flatten() == 1].reshape(-1, 1, 2)
+            
+            # Re-seed Char 2 if points dwindle
+            if len(p2_curr) < num_points_per_character // 2 and np.any(m2_curr > 0):
+                new_pts2 = cv2.goodFeaturesToTrack(gray, maxCorners=num_points_per_character - len(p2_curr), qualityLevel=0.01, minDistance=8, mask=m2_curr)
+                if new_pts2 is not None and len(new_pts2) > 0:
+                    p2_curr = np.vstack([p2_curr, new_pts2]) if len(p2_curr) > 0 else new_pts2
             tracks2.append(p2_curr.reshape(-1, 2))
 
             prev_gray = gray
@@ -3804,35 +3872,35 @@ class DualPersonTAPNetTracker:
         out_c2 = []
 
         for fi in range(num_frames):
-            canv_dual = np.zeros((h, w, 3), dtype=np.uint8)
-            canv_c1 = np.zeros((h, w, 3), dtype=np.uint8)
-            canv_c2 = np.zeros((h, w, 3), dtype=np.uint8)
+            canv_dual = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+            canv_c1 = np.zeros((h_p, w_p, 3), dtype=np.uint8)
+            canv_c2 = np.zeros((h_p, w_p, 3), dtype=np.uint8)
 
             start_t = max(0, fi - trail_window)
 
             # Char 1 (YELLOW)
             for pt in tracks1[fi]:
-                cv2.circle(canv_c1, (int(pt[0]), int(pt[1])), point_radius, c1_rgb, -1)
-                cv2.circle(canv_dual, (int(pt[0]), int(pt[1])), point_radius, c1_rgb, -1)
+                cv2.circle(canv_c1, (int(round(pt[0])), int(round(pt[1]))), point_radius, c1_rgb, -1)
+                cv2.circle(canv_dual, (int(round(pt[0])), int(round(pt[1]))), point_radius, c1_rgb, -1)
             for t in range(start_t, fi):
                 for p_idx in range(min(len(tracks1[t]), len(tracks1[t+1]))):
                     alpha = (t - start_t + 1) / float(trail_window)
                     col = tuple(int(c * alpha) for c in c1_rgb)
-                    pt_a = tuple(tracks1[t][p_idx].astype(int))
-                    pt_b = tuple(tracks1[t+1][p_idx].astype(int))
+                    pt_a = tuple(np.round(tracks1[t][p_idx]).astype(int))
+                    pt_b = tuple(np.round(tracks1[t+1][p_idx]).astype(int))
                     cv2.line(canv_c1, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
                     cv2.line(canv_dual, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
 
             # Char 2 (BLUE)
             for pt in tracks2[fi]:
-                cv2.circle(canv_c2, (int(pt[0]), int(pt[1])), point_radius, c2_rgb, -1)
-                cv2.circle(canv_dual, (int(pt[0]), int(pt[1])), point_radius, c2_rgb, -1)
+                cv2.circle(canv_c2, (int(round(pt[0])), int(round(pt[1]))), point_radius, c2_rgb, -1)
+                cv2.circle(canv_dual, (int(round(pt[0])), int(round(pt[1]))), point_radius, c2_rgb, -1)
             for t in range(start_t, fi):
                 for p_idx in range(min(len(tracks2[t]), len(tracks2[t+1]))):
                     alpha = (t - start_t + 1) / float(trail_window)
                     col = tuple(int(c * alpha) for c in c2_rgb)
-                    pt_a = tuple(tracks2[t][p_idx].astype(int))
-                    pt_b = tuple(tracks2[t+1][p_idx].astype(int))
+                    pt_a = tuple(np.round(tracks2[t][p_idx]).astype(int))
+                    pt_b = tuple(np.round(tracks2[t+1][p_idx]).astype(int))
                     cv2.line(canv_c2, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
                     cv2.line(canv_dual, pt_a, pt_b, col, max(1, int(point_radius * alpha)), cv2.LINE_AA)
 
@@ -3843,15 +3911,15 @@ class DualPersonTAPNetTracker:
         temp_dir = folder_paths.get_temp_directory()
         tmp_mp4 = os.path.join(temp_dir, f"dual_tapnet_tracker_{int(time.time())}.mp4")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w, h))
+        out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w_p, h_p))
         for f in out_dual:
             out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
         out_w.release()
 
         dual_tapnet_data = {
             "fps": fps,
-            "width": w,
-            "height": h,
+            "width": w_p,
+            "height": h_p,
             "char1_color": c1_rgb,
             "char2_color": c2_rgb,
             "tracks1": tracks1,
