@@ -1386,6 +1386,12 @@
           "link": 17
         },
         {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
           "localized_name": "prompt",
           "name": "prompt",
           "type": "STRING",
@@ -1429,6 +1435,15 @@
             "name": "response_modalities"
           },
           "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -1455,8 +1470,10 @@
         "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
         "gemini-2.5-flash-image",
         43,
+        "randomize",
         "auto",
-        "IMAGE"
+        "IMAGE",
+        "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input\u2014regardless of format, intent, or abstraction\u2014as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests."
       ],
       "title": "Nano Banana Stylizer 1 (Keyframe 1 Stylization)"
     },
@@ -1666,6 +1683,12 @@
           "link": 22
         },
         {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
           "localized_name": "prompt",
           "name": "prompt",
           "type": "STRING",
@@ -1709,6 +1732,15 @@
             "name": "response_modalities"
           },
           "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -1735,8 +1767,10 @@
         "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
         "gemini-2.5-flash-image",
         44,
+        "randomize",
         "auto",
-        "IMAGE"
+        "IMAGE",
+        "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input\u2014regardless of format, intent, or abstraction\u2014as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests."
       ],
       "title": "Nano Banana Stylizer 2 (Keyframe 2 Stylization)"
     },
@@ -1946,6 +1980,12 @@
           "link": 27
         },
         {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
           "localized_name": "prompt",
           "name": "prompt",
           "type": "STRING",
@@ -1989,6 +2029,15 @@
             "name": "response_modalities"
           },
           "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2015,8 +2064,10 @@
         "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
         "gemini-2.5-flash-image",
         45,
+        "randomize",
         "auto",
-        "IMAGE"
+        "IMAGE",
+        "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input\u2014regardless of format, intent, or abstraction\u2014as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests."
       ],
       "title": "Nano Banana Stylizer 3 (Keyframe 3 Stylization)"
     },
@@ -2226,6 +2277,12 @@
           "link": 32
         },
         {
+          "localized_name": "files",
+          "name": "files",
+          "type": "GEMINI_INPUT_FILES",
+          "link": null
+        },
+        {
           "localized_name": "prompt",
           "name": "prompt",
           "type": "STRING",
@@ -2269,6 +2326,15 @@
             "name": "response_modalities"
           },
           "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2295,8 +2361,10 @@
         "Extract only the brush texture, impasto thickness, rich pigment blending, and physical canvas grain from the style reference image. Do not transfer subject composition or layout. Transfer the physical oil paint medium onto the exact brushstroke structure of the structural screenshot, preserving the kinetic lines, curves, and trajectory structure exactly, while adding tactile 3D impasto paint ridges, subtle brush hair striations, and luminous oil glaze.",
         "gemini-2.5-flash-image",
         46,
+        "randomize",
         "auto",
-        "IMAGE"
+        "IMAGE",
+        "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input\u2014regardless of format, intent, or abstraction\u2014as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests."
       ],
       "title": "Nano Banana Stylizer 4 (Keyframe 4 Stylization)"
     },
