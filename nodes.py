@@ -431,7 +431,7 @@ class GeminiOmniModel:
             model_name = "gemini-omni-flash-preview"
 
         ar = config.get("aspect_ratio", "16:9")
-        task = config.get("task", "text_to_video")
+        task = config.get("task", "video_editing")
         duration = int(config.get("duration", 3))
         delivery = config.get("delivery", "base64")
         prefix_text = config.get("prefix_text", "")
@@ -542,6 +542,13 @@ class GeminiOmniModel:
                     print(f"Error encoding image for Omni: {e}")
 
             has_video_input = any(p.get("type") == "video" for p in inputs_payload)
+            has_image_input = any(p.get("type") == "image" for p in inputs_payload)
+
+            # Auto-align task with actual input media payload to prevent Google API text_to_video rejection
+            if has_video_input:
+                task = "video_editing"
+            elif has_image_input and task == "text_to_video":
+                task = "image_to_video"
 
             # Process explicit image & video reference roles
             image_roles = config.get("image_roles", {})
