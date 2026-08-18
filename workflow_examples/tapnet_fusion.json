@@ -390,9 +390,7 @@
         {
           "name": "dynamic_prompt",
           "type": "STRING",
-          "links": [
-            40
-          ],
+          "links": [],
           "localized_name": "dynamic_prompt"
         }
       ],
@@ -1217,7 +1215,9 @@
           "localized_name": "STRING",
           "name": "STRING",
           "type": "STRING",
-          "links": []
+          "links": [
+            40
+          ]
         }
       ],
       "properties": {
@@ -2055,8 +2055,8 @@
     ],
     [
       40,
-      60,
-      2,
+      5,
+      0,
       6,
       3,
       "STRING"

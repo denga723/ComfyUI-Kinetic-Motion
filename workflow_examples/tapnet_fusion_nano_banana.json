@@ -604,9 +604,7 @@
           "localized_name": "dynamic_prompt_string",
           "name": "dynamic_prompt_string",
           "type": "STRING",
-          "links": [
-            44
-          ]
+          "links": []
         }
       ],
       "properties": {
@@ -2604,7 +2602,9 @@
           "localized_name": "STRING",
           "name": "STRING",
           "type": "STRING",
-          "links": []
+          "links": [
+            44
+          ]
         }
       ],
       "properties": {
@@ -3420,8 +3420,8 @@
     ],
     [
       44,
-      60,
-      2,
+      5,
+      0,
       6,
       3,
       "STRING"
