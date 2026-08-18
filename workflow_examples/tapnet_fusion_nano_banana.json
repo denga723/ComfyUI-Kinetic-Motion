@@ -138,6 +138,15 @@
             "name": "fps"
           },
           "link": null
+        },
+        {
+          "localized_name": "max_resolution",
+          "name": "max_resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -217,7 +226,8 @@
         "enable",
         0.6,
         "full",
-        24
+        24,
+        "720p (Fastest)"
       ],
       "title": "Google Kinetic Motion Curve Extractor"
     },
@@ -319,6 +329,15 @@
             "name": "fps"
           },
           "link": null
+        },
+        {
+          "localized_name": "max_resolution",
+          "name": "max_resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -356,7 +375,8 @@
         3,
         "radiant_red",
         0.4,
-        24
+        24,
+        "720p (Fastest)"
       ],
       "title": "DeepMind TAPNet Lagrangian Point Tracker"
     },

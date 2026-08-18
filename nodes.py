@@ -1704,6 +1704,7 @@ class KineticMotionCurveExtractor:
                 "temporal_smoothing": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "model_complexity": (["full", "heavy", "lite"], {"default": "full"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "1440p", "Original (No Limit)"], {"default": "720p (Fastest)", "tooltip": "Automatically limit processing resolution to prevent 4K/UHD bottlenecks and excessive memory usage"}),
             }
         }
 
@@ -1748,7 +1749,7 @@ class KineticMotionCurveExtractor:
             tw = cv2.getTextSize(subtext, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)[0][0]
             cv2.putText(img, subtext, (max(10, w - tw - 10), 23), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 200, 230), 1, cv2.LINE_AA)
 
-    def extract_motion_representation(self, video_or_images, spline_type="catmull_rom_spline", trail_window=20, stroke_base_thickness=18, speed_to_width_factor=1.8, speed_to_brightness_factor=1.2, dense_optical_flow="enable", temporal_smoothing=0.6, model_complexity="full", fps=24):
+    def extract_motion_representation(self, video_or_images, spline_type="catmull_rom_spline", trail_window=20, stroke_base_thickness=18, speed_to_width_factor=1.8, speed_to_brightness_factor=1.2, dense_optical_flow="enable", temporal_smoothing=0.6, model_complexity="full", fps=24, max_resolution="720p (Fastest)"):
         import os
         import urllib.request
         import numpy as np
@@ -1815,6 +1816,25 @@ class KineticMotionCurveExtractor:
 
         if not frames_rgb:
             raise ValueError("[KineticMotionCurveExtractor] No frames could be decoded from input.")
+
+        # Resolution limiter (prevents 4K / UHD video bottlenecks)
+        orig_h, orig_w, _ = frames_rgb[0].shape
+        res_limits = {
+            "540p (Draft)": 960,
+            "720p (Fastest)": 1280,
+            "1080p (Standard)": 1920,
+            "1440p": 2560,
+            "Original (No Limit)": 0
+        }
+        max_dim = res_limits.get(max_resolution, 1280)
+        if max_dim > 0 and max(orig_w, orig_h) > max_dim:
+            scale = float(max_dim) / float(max(orig_w, orig_h))
+            target_w = int(round(orig_w * scale))
+            target_h = int(round(orig_h * scale))
+            target_w -= (target_w % 2)
+            target_h -= (target_h % 2)
+            print(f"[KineticMotionCurveExtractor] Auto-downscaling input video from {orig_w}x{orig_h} (4K/UHD) to {target_w}x{target_h} ({max_resolution})")
+            frames_rgb = [cv2.resize(f, (target_w, target_h), interpolation=cv2.INTER_AREA) for f in frames_rgb]
 
         TRAIL_PALETTE = {
             15: (255, 60, 140),   # Left wrist (Rose)
@@ -2314,6 +2334,7 @@ class TAPNetKineticPointTracker:
                 "color_scheme": (["radiant_red", "emerald_green", "electric_blue", "hot_pink", "luminous_white", "golden_amber", "track_spectrum", "velocity_heat", "cyan_amber"], {"default": "radiant_red", "tooltip": "Color palette for tracked points and ribbons"}),
                 "occlusion_threshold": ("FLOAT", {"default": 0.40, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Visibility confidence cutoff for occlusion detection"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Output playback frame rate"}),
+                "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "1440p", "Original (No Limit)"], {"default": "720p (Fastest)", "tooltip": "Automatically limit processing resolution to prevent 4K/UHD bottlenecks and excessive memory usage"}),
             }
         }
 
@@ -2333,28 +2354,51 @@ class TAPNetKineticPointTracker:
         trail_thickness: int = 3,
         color_scheme: str = "radiant_red",
         occlusion_threshold: float = 0.40,
-        fps: int = 24
+        fps: int = 24,
+        max_resolution: str = "720p (Fastest)"
     ):
-        # 1. Read input frames
+        # 1. Read input frames (reuse already processed frames if available)
         frames = []
-        video_path = get_video_file_path(video_or_images)
-        if video_path and os.path.exists(video_path):
-            cap = cv2.VideoCapture(video_path)
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret: break
-                frames.append(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-            cap.release()
-        elif isinstance(video_or_images, torch.Tensor):
-            t = video_or_images.cpu().numpy()
-            if len(t.shape) == 4:
-                for fi in range(t.shape[0]):
-                    frames.append((np.clip(t[fi], 0.0, 1.0) * 255.0).astype(np.uint8))
-            elif len(t.shape) == 3:
-                frames.append((np.clip(t, 0.0, 1.0) * 255.0).astype(np.uint8))
+        if isinstance(mask_or_images, dict) and "frames_rgb" in mask_or_images and len(mask_or_images["frames_rgb"]) > 0:
+            frames = [cv2.cvtColor(f, cv2.COLOR_RGB2BGR) for f in mask_or_images["frames_rgb"]]
+        else:
+            video_path = get_video_file_path(video_or_images)
+            if video_path and os.path.exists(video_path):
+                cap = cv2.VideoCapture(video_path)
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret: break
+                    frames.append(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+                cap.release()
+            elif isinstance(video_or_images, torch.Tensor):
+                t = video_or_images.cpu().numpy()
+                if len(t.shape) == 4:
+                    for fi in range(t.shape[0]):
+                        frames.append((np.clip(t[fi], 0.0, 1.0) * 255.0).astype(np.uint8))
+                elif len(t.shape) == 3:
+                    frames.append((np.clip(t, 0.0, 1.0) * 255.0).astype(np.uint8))
 
         if not frames:
             raise ValueError("[TAPNetKineticPointTracker] Could not load video frames from input.")
+
+        # Resolution limiter (prevents 4K / UHD bottlenecks)
+        orig_h, orig_w = frames[0].shape[:2]
+        res_limits = {
+            "540p (Draft)": 960,
+            "720p (Fastest)": 1280,
+            "1080p (Standard)": 1920,
+            "1440p": 2560,
+            "Original (No Limit)": 0
+        }
+        max_dim = res_limits.get(max_resolution, 1280)
+        if max_dim > 0 and max(orig_w, orig_h) > max_dim:
+            scale = float(max_dim) / float(max(orig_w, orig_h))
+            target_w = int(round(orig_w * scale))
+            target_h = int(round(orig_h * scale))
+            target_w -= (target_w % 2)
+            target_h -= (target_h % 2)
+            print(f"[TAPNetKineticPointTracker] Auto-downscaling input video from {orig_w}x{orig_h} (4K/UHD) to {target_w}x{target_h} ({max_resolution})")
+            frames = [cv2.resize(f, (target_w, target_h), interpolation=cv2.INTER_AREA) for f in frames]
 
         num_frames = len(frames)
         h, w = frames[0].shape[:2]

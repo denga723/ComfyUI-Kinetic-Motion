@@ -138,6 +138,15 @@
             "name": "fps"
           },
           "link": null
+        },
+        {
+          "localized_name": "max_resolution",
+          "name": "max_resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -216,7 +225,8 @@
         "enable",
         0.6,
         "full",
-        24
+        24,
+        "720p (Fastest)"
       ]
     },
     {
