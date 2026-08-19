@@ -4312,8 +4312,8 @@ class DualPersonStagePipelineViewer:
 class HumanSegmentationExtractor:
     """
     Step 1: Human Segmentation Extractor.
-    Segments both human dancers together out from the video, isolating them completely from the stage background.
-    Outputs the black-and-white Human Segmentation Mask and the isolated Cutout Video on dark canvas.
+    Extracts the human dancers out from the video, placing them on a 100% pitch-black background
+    with an illuminated cyan boundary contour outline, matching the original Kinetic Stage 1 segmentation aesthetic.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -4322,15 +4322,16 @@ class HumanSegmentationExtractor:
                 "video_or_images": (ANY_TYPE, {"tooltip": "Input video stream or image batch"}),
             },
             "optional": {
-                "background_threshold": ("INT", {"default": 18, "min": 2, "max": 100, "step": 1, "tooltip": "Dark stage background cutoff threshold"}),
+                "background_threshold": ("INT", {"default": 14, "min": 2, "max": 100, "step": 1, "tooltip": "Dark stage background cutoff threshold"}),
+                "contour_outline": (["enable", "disable"], {"default": "enable", "tooltip": "Draw glowing cyan boundary contour around extracted dancers"}),
                 "edge_smoothing": ("INT", {"default": 5, "min": 1, "max": 21, "step": 2, "tooltip": "Morphological edge smoothing kernel"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
                 "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE", "STRING")
-    RETURN_NAMES = ("human_segmentation_mask", "segmented_human_cutout", "video_path")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("1_segmentation_mask", "clean_character_cutout", "binary_silhouette_mask", "video_path")
     FUNCTION = "extract_human_segmentation"
     CATEGORY = "kinetic_motion"
 
@@ -4357,7 +4358,7 @@ class HumanSegmentationExtractor:
             return res
         return []
 
-    def extract_human_segmentation(self, video_or_images, background_threshold=18, edge_smoothing=5, fps=24, max_resolution="720p (Fastest)"):
+    def extract_human_segmentation(self, video_or_images, background_threshold=14, contour_outline="enable", edge_smoothing=5, fps=24, max_resolution="720p (Fastest)"):
         raw_frames = self._extract_frames(video_or_images)
         if not raw_frames:
             raise ValueError("[HumanSegmentationExtractor] No video frames found.")
@@ -4380,20 +4381,22 @@ class HumanSegmentationExtractor:
         kernel_k = max(3, int(edge_smoothing))
         if kernel_k % 2 == 0: kernel_k += 1
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
-
-        out_masks = []
-        out_cutouts = []
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+
+        out_stage1 = []
+        out_cutouts = []
+        out_masks = []
 
         for fi in range(num_frames):
             frame = proc_frames[fi]
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
 
+            # Isolate the dancers from background
             fg_raw = (gray > background_threshold).astype(np.uint8) * 255
             fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
             fg_clean = cv2.morphologyEx(fg_clean, cv2.MORPH_OPEN, kernel_open)
 
-            # Connected component filtering to remove stage lighting reflections and keep human bodies
+            # Connected component filtering to keep only human dancers
             num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_clean)
             dancer_mask = np.zeros_like(fg_clean)
             for label in range(1, num_labels):
@@ -4401,26 +4404,36 @@ class HumanSegmentationExtractor:
                     dancer_mask[labels == label] = 255
 
             dancer_mask = cv2.dilate(dancer_mask, kernel_open)
-            mask_3c = cv2.cvtColor(dancer_mask, cv2.COLOR_GRAY2RGB)
 
-            # Cutout characters with 100% pure black background [0, 0, 0]
+            # 1. Clean Cutout on pure pitch-black background [0, 0, 0]
             cutout = np.zeros_like(frame)
             cutout[dancer_mask > 0] = frame[dancer_mask > 0]
 
-            out_masks.append(mask_3c.astype(np.float32) / 255.0)
+            # 2. Stage 1 Segmentation View (with glowing cyan silhouette outline)
+            annotated_stage1 = cutout.copy()
+            if contour_outline == "enable" and np.any(dancer_mask > 0):
+                contours, _ = cv2.findContours(dancer_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(annotated_stage1, contours, -1, (0, 230, 255), 2)
+
+            # 3. Solid 3-channel Binary Mask
+            mask_3c = cv2.cvtColor(dancer_mask, cv2.COLOR_GRAY2RGB)
+
+            out_stage1.append(annotated_stage1.astype(np.float32) / 255.0)
             out_cutouts.append(cutout.astype(np.float32) / 255.0)
+            out_masks.append(mask_3c.astype(np.float32) / 255.0)
 
         temp_dir = folder_paths.get_temp_directory()
         tmp_mp4 = os.path.join(temp_dir, f"human_segmentation_{int(time.time())}.mp4")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w_p, h_p))
-        for f in out_cutouts:
+        for f in out_stage1:
             out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
         out_w.release()
 
         return (
-            torch.from_numpy(np.array(out_masks, dtype=np.float32)),
+            torch.from_numpy(np.array(out_stage1, dtype=np.float32)),
             torch.from_numpy(np.array(out_cutouts, dtype=np.float32)),
+            torch.from_numpy(np.array(out_masks, dtype=np.float32)),
             tmp_mp4
         )
 
