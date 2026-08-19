@@ -2712,6 +2712,8 @@ class KineticTAPNetBrushFusionRenderer:
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
                 "brush_color_mode": ([
+                    "grass_yellow_purple_flowers",
+                    "green_grass_yellow_purple",
                     "peach_pink_skyblue",
                     "pink_kinetic_skyblue_tapnet",
                     "pink_kinetic_cyan_tapnet",
@@ -2875,7 +2877,16 @@ class KineticTAPNetBrushFusionRenderer:
                 "default": (0.1, 1.0, 0.35)
             }
             is_tapnet_rainbow = True
-            filament_base = (1.0, 1.0, 1.0)
+        elif brush_color_mode in ["grass_yellow_purple_flowers", "green_grass_yellow_purple"]:
+            skeletal_palette = {
+                15: (0.15, 0.92, 0.32), 16: (0.15, 0.92, 0.32), # Lush Meadow Grass Green (Wrists)
+                13: (1.0, 0.88, 0.15), 14: (1.0, 0.88, 0.15), # Blooming Yellow Buttercups (Elbows)
+                27: (0.75, 0.22, 0.95), 28: (0.75, 0.22, 0.95), # Vivid Purple Wildflowers (Ankles)
+                25: (0.10, 0.76, 0.25), 26: (0.10, 0.76, 0.25), # Botanical Foliage Green (Knees)
+                11: (0.20, 0.85, 0.35), 12: (0.20, 0.85, 0.35), # Soft Grass Meadow (Shoulders)
+                "default": (0.15, 0.88, 0.30)
+            }
+            filament_base = (0.78, 0.25, 0.98) # Delicate Purple Floral Filaments & Yellow Embers
         elif brush_color_mode == "gold_kinetic_cyan_tapnet":
             skeletal_palette = {
                 15: (1.0, 0.75, 0.15), 16: (1.0, 0.75, 0.15), 27: (1.0, 0.6, 0.1), 28: (1.0, 0.6, 0.1),
