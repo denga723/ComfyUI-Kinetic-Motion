@@ -4383,6 +4383,7 @@ class HumanSegmentationExtractor:
 
         out_masks = []
         out_cutouts = []
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
         for fi in range(num_frames):
             frame = proc_frames[fi]
@@ -4390,10 +4391,21 @@ class HumanSegmentationExtractor:
 
             fg_raw = (gray > background_threshold).astype(np.uint8) * 255
             fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
-            fg_clean = cv2.GaussianBlur(fg_clean, (3, 3), 0)
+            fg_clean = cv2.morphologyEx(fg_clean, cv2.MORPH_OPEN, kernel_open)
 
-            mask_3c = cv2.cvtColor(fg_clean, cv2.COLOR_GRAY2RGB)
-            cutout = cv2.bitwise_and(frame, frame, mask=fg_clean)
+            # Connected component filtering to remove stage lighting reflections and keep human bodies
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_clean)
+            dancer_mask = np.zeros_like(fg_clean)
+            for label in range(1, num_labels):
+                if stats[label, cv2.CC_STAT_AREA] > 200:
+                    dancer_mask[labels == label] = 255
+
+            dancer_mask = cv2.dilate(dancer_mask, kernel_open)
+            mask_3c = cv2.cvtColor(dancer_mask, cv2.COLOR_GRAY2RGB)
+
+            # Cutout characters with 100% pure black background [0, 0, 0]
+            cutout = np.zeros_like(frame)
+            cutout[dancer_mask > 0] = frame[dancer_mask > 0]
 
             out_masks.append(mask_3c.astype(np.float32) / 255.0)
             out_cutouts.append(cutout.astype(np.float32) / 255.0)
@@ -4402,7 +4414,7 @@ class HumanSegmentationExtractor:
         tmp_mp4 = os.path.join(temp_dir, f"human_segmentation_{int(time.time())}.mp4")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w_p, h_p))
-        for f in out_masks:
+        for f in out_cutouts:
             out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
         out_w.release()
 
