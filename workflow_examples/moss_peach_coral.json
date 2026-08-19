@@ -1148,10 +1148,10 @@
         0.4,
         0.6,
         "enable",
-        "warm_amber",
+        "peach_pink_skyblue",
         24
       ],
-      "title": "Kinetic + TAPNet Brush Fusion Renderer"
+      "title": "Kinetic + TAPNet Brush Fusion Renderer (Peach / Pink / Sky Blue)"
     },
     {
       "id": 61,
@@ -1232,9 +1232,9 @@
         24,
         "mp4",
         true,
-        "Stage6_Fused_Brushstrokes"
+        "Stage6_Fused_Peach_Pink_SkyBlue"
       ],
-      "title": "Stage 6: Fused Kinetic + TAPNet Dynamic Brushstrokes Video"
+      "title": "Stage 6: Fused Peach / Pink / Sky Blue Brushstrokes Video"
     },
     {
       "id": 17,
@@ -1394,7 +1394,7 @@
         "andrew_test4.png",
         "image"
       ],
-      "title": "Golden Yellow Slime Reference 4"
+      "title": "Sky Blue Accented Slime Reference 4"
     },
     {
       "id": 4,
@@ -1461,7 +1461,7 @@
       "widgets_values": [
         4
       ],
-      "title": "4 Peach / Coral / Golden Style References (Image1..Image4)"
+      "title": "4 Peach / Coral / Sky Blue Style References (Image1..Image4)"
     },
     {
       "id": 5,
@@ -1492,9 +1492,9 @@
         "Node name for S&R": "PrimitiveStringMultiline"
       },
       "widgets_values": [
-        "Glossy biomorphic / bacterial slime sculpture \u2014 dense vein-like filament networks mixed with translucent gelatinous folds and blobs, in a specialized color palette of pale peach, soft salmon pink, coral red, and golden yellow on a pure black background. It feels like moss, fungus, biofilm, or microscopic organic growth, with wet reflective surfaces, translucent fleshy undertones, and intricate cellular detail. Perform high-fidelity video style transfer on Video1 using the physical textures, impasto depth, wet highlights, and delicate palette of pale peach, soft salmon pink, coral red, and golden yellow from Image1, Image2, Image3, and Image4. Strictly preserve the exact physical motion paths, trajectories, curves, velocity, and timing of the moving brushstrokes from Video1 without altering their structure or animation layout."
+        "Glossy biomorphic / bacterial slime sculpture \u2014 dense vein-like filament networks mixed with translucent gelatinous folds and blobs, in a specialized color palette of pale peach, soft salmon pink, coral red, and golden yellow, accented with delicate subtle touches of translucent sky blue on a pure black background. It feels like moss, fungus, biofilm, or microscopic organic growth, with wet reflective surfaces, translucent fleshy undertones, luminous sky blue filament highlights, and intricate cellular detail. Perform high-fidelity video style transfer on Video1 using the physical textures, impasto depth, wet highlights, and delicate palette of pale peach, soft salmon pink, coral red, and subtle sky blue accents from Image1, Image2, Image3, and Image4. Strictly preserve the exact physical motion paths, trajectories, curves, velocity, and timing of the moving brushstrokes from Video1 without altering their structure or animation layout."
       ],
-      "title": "Peach / Coral / Golden Slime Sculpture Prompt"
+      "title": "Peach / Coral / Sky Blue Slime Sculpture Prompt"
     },
     {
       "id": 6,
@@ -1818,7 +1818,7 @@
         24,
         "mp4",
         true,
-        "Moss_Peach_Coral_Final_Art"
+        "Moss_Peach_Coral_SkyBlue_Final_Art"
       ],
       "title": "Final Stylized Kinetic Artwork Video (Omni Render)"
     },
@@ -1947,7 +1947,7 @@
         24,
         "mp4",
         true,
-        "Moss_Peach_Coral_Comparison"
+        "Moss_Peach_Coral_SkyBlue_Comparison"
       ],
       "title": "Dual Output Viewer (Stage 6 + Final Art Side-by-Side)"
     },
@@ -2092,7 +2092,7 @@
         24,
         "mp4",
         true,
-        "Moss_Peach_Coral_Pipeline"
+        "Moss_Peach_Coral_SkyBlue_Pipeline"
       ],
       "title": "8-Stage Full Pipeline Multi-Video Preview (All 8 Stages)"
     }
@@ -2395,7 +2395,7 @@
       "font_size": 24
     },
     {
-      "title": "3. Kinetic + TAPNet Physical Brush Fusion Renderer (Stage 6)",
+      "title": "3. Kinetic + TAPNet Physical Brush Fusion Renderer (Stage 6: Peach / Pink / Sky Blue)",
       "bounding": [
         1240,
         640,
@@ -2406,7 +2406,7 @@
       "font_size": 24
     },
     {
-      "title": "4. 4 Style Reference Images & Peach / Coral / Golden Sculpture Prompt",
+      "title": "4. 4 Style Reference Images & Peach / Coral / Sky Blue Sculpture Prompt",
       "bounding": [
         60,
         1380,

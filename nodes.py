@@ -2698,6 +2698,9 @@ class KineticTAPNetBrushFusionRenderer:
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
                 "brush_color_mode": ([
+                    "peach_pink_skyblue",
+                    "pink_kinetic_skyblue_tapnet",
+                    "pink_kinetic_cyan_tapnet",
                     "duet_harmonic_quad_color",
                     "green_kinetic_red_tapnet",
                     "white_kinetic_colorful_tapnet",
@@ -2710,7 +2713,6 @@ class KineticTAPNetBrushFusionRenderer:
                     "colorful_kinetic_white_tapnet",
                     "green_kinetic_colorful_tapnet",
                     "gold_kinetic_cyan_tapnet",
-                    "pink_kinetic_cyan_tapnet",
                     "blue_kinetic_amber_tapnet",
                     "amber_kinetic_amber_tapnet",
                     "cyan_kinetic_cyan_tapnet",
@@ -2866,12 +2868,16 @@ class KineticTAPNetBrushFusionRenderer:
                 "default": (1.0, 0.75, 0.15)
             }
             filament_base = (0.05, 0.85, 1.0)
-        elif brush_color_mode == "pink_kinetic_cyan_tapnet":
+        elif brush_color_mode in ["peach_pink_skyblue", "pink_kinetic_skyblue_tapnet", "pink_kinetic_cyan_tapnet"]:
             skeletal_palette = {
-                15: (1.0, 0.15, 0.65), 16: (1.0, 0.15, 0.65), 27: (0.9, 0.1, 0.8), 28: (0.9, 0.1, 0.8),
-                "default": (1.0, 0.15, 0.65)
+                15: (1.0, 0.45, 0.58), 16: (1.0, 0.45, 0.58), # Salmon / Peach Pink (Wrists)
+                13: (1.0, 0.65, 0.52), 14: (1.0, 0.65, 0.52), # Pale Peach (Elbows)
+                27: (1.0, 0.28, 0.35), 28: (1.0, 0.28, 0.35), # Coral Red (Ankles)
+                25: (1.0, 0.72, 0.35), 26: (1.0, 0.72, 0.35), # Golden Warmth (Knees)
+                11: (1.0, 0.50, 0.55), 12: (1.0, 0.50, 0.55), # Soft Pink (Shoulders)
+                "default": (1.0, 0.50, 0.55)
             }
-            filament_base = (0.05, 0.9, 1.0)
+            filament_base = (0.35, 0.75, 1.0) # Delicate Luminous Sky Blue
         elif brush_color_mode == "blue_kinetic_amber_tapnet":
             skeletal_palette = {
                 15: (0.1, 0.4, 1.0), 16: (0.1, 0.4, 1.0), 27: (0.05, 0.3, 0.9), 28: (0.05, 0.3, 0.9),
