@@ -1709,7 +1709,7 @@ class KineticMotionCurveExtractor:
                 "speed_to_brightness_factor": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 3.0, "step": 0.1}),
                 "dense_optical_flow": (["enable", "disable"], {"default": "enable"}),
                 "temporal_smoothing": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
-                "model_complexity": (["full", "heavy", "lite"], {"default": "full"}),
+                "model_complexity": (["heavy", "full", "lite"], {"default": "heavy"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
                 "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "1440p", "Original (No Limit)"], {"default": "720p (Fastest)", "tooltip": "Automatically limit processing resolution to prevent 4K/UHD bottlenecks and excessive memory usage"}),
             }
@@ -2338,7 +2338,7 @@ class TAPNetKineticPointTracker:
                 "trail_history": ("INT", {"default": 24, "min": 2, "max": 60, "step": 1, "tooltip": "Temporal history trail length in frames"}),
                 "point_radius": ("INT", {"default": 5, "min": 1, "max": 16, "step": 1, "tooltip": "Visualized point marker radius in pixels"}),
                 "trail_thickness": ("INT", {"default": 3, "min": 1, "max": 12, "step": 1, "tooltip": "Visualized point trajectory trail line thickness"}),
-                "color_scheme": (["radiant_red", "emerald_green", "electric_blue", "hot_pink", "luminous_white", "golden_amber", "track_spectrum", "velocity_heat", "cyan_amber"], {"default": "radiant_red", "tooltip": "Color palette for tracked points and ribbons"}),
+                "color_scheme": (["emerald_green", "radiant_red", "electric_blue", "hot_pink", "luminous_white", "golden_amber", "track_spectrum", "velocity_heat", "cyan_amber"], {"default": "emerald_green", "tooltip": "Color palette for tracked points and ribbons"}),
                 "occlusion_threshold": ("FLOAT", {"default": 0.40, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Visibility confidence cutoff for occlusion detection"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60, "tooltip": "Output playback frame rate"}),
                 "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "1440p", "Original (No Limit)"], {"default": "720p (Fastest)", "tooltip": "Automatically limit processing resolution to prevent 4K/UHD bottlenecks and excessive memory usage"}),
@@ -2359,7 +2359,7 @@ class TAPNetKineticPointTracker:
         trail_history: int = 24,
         point_radius: int = 5,
         trail_thickness: int = 3,
-        color_scheme: str = "radiant_red",
+        color_scheme: str = "emerald_green",
         occlusion_threshold: float = 0.40,
         fps: int = 24,
         max_resolution: str = "720p (Fastest)"

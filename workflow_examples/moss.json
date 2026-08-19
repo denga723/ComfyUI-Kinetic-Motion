@@ -223,14 +223,14 @@
         "Node name for S&R": "KineticMotionCurveExtractor"
       },
       "widgets_values": [
-        "centripetal_catmull_rom",
-        16,
-        8,
-        1.5,
+        "catmull_rom_spline",
+        20,
+        18,
+        1.8,
         1.2,
         "enable",
-        0.5,
-        "heavy (high accuracy)",
+        0.6,
+        "heavy",
         24,
         "720p (Fastest)"
       ],
@@ -743,7 +743,7 @@
       ],
       "size": [
         400,
-        480
+        520
       ],
       "flags": {},
       "order": 2,
@@ -756,8 +756,8 @@
           "link": 8
         },
         {
-          "localized_name": "mask_guidance",
-          "name": "mask_guidance",
+          "localized_name": "mask_or_images",
+          "name": "mask_or_images",
           "type": "*",
           "link": 9
         },
@@ -771,29 +771,20 @@
           "link": null
         },
         {
-          "localized_name": "tracking_mode",
-          "name": "tracking_mode",
+          "localized_name": "grid_sampling",
+          "name": "grid_sampling",
           "type": "COMBO",
           "widget": {
-            "name": "tracking_mode"
+            "name": "grid_sampling"
           },
           "link": null
         },
         {
-          "localized_name": "point_color",
-          "name": "point_color",
-          "type": "COMBO",
-          "widget": {
-            "name": "point_color"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "trail_window",
-          "name": "trail_window",
+          "localized_name": "trail_history",
+          "name": "trail_history",
           "type": "INT",
           "widget": {
-            "name": "trail_window"
+            "name": "trail_history"
           },
           "link": null
         },
@@ -803,6 +794,33 @@
           "type": "INT",
           "widget": {
             "name": "point_radius"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "trail_thickness",
+          "name": "trail_thickness",
+          "type": "INT",
+          "widget": {
+            "name": "trail_thickness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "color_scheme",
+          "name": "color_scheme",
+          "type": "COMBO",
+          "widget": {
+            "name": "color_scheme"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "occlusion_threshold",
+          "name": "occlusion_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "occlusion_threshold"
           },
           "link": null
         },
@@ -827,8 +845,8 @@
       ],
       "outputs": [
         {
-          "localized_name": "tapnet_visualization",
-          "name": "tapnet_visualization",
+          "localized_name": "point_tracking_preview",
+          "name": "point_tracking_preview",
           "type": "IMAGE",
           "links": [
             10,
@@ -842,9 +860,9 @@
           "links": []
         },
         {
-          "localized_name": "tapnet_point_data",
-          "name": "tapnet_point_data",
-          "type": "TAPNET_POINT_DATA",
+          "localized_name": "tapnet_track_data",
+          "name": "tapnet_track_data",
+          "type": "TAPNET_TRACK_DATA",
           "links": [
             12
           ]
@@ -855,10 +873,12 @@
       },
       "widgets_values": [
         128,
-        "surface_grid_dense",
-        "rainbow",
-        20,
-        4,
+        "dancer_silhouette",
+        24,
+        5,
+        3,
+        "emerald_green",
+        0.4,
         24,
         "720p (Fastest)"
       ],
