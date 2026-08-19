@@ -2712,6 +2712,8 @@ class KineticTAPNetBrushFusionRenderer:
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
                 "brush_color_mode": ([
+                    "icecream_marbled_berry_confetti",
+                    "icecream_pink_cream_berry",
                     "feather_fur_ivory_chestnut",
                     "chocolate_fur_ivory_feather",
                     "grass_yellow_purple_flowers",
@@ -2878,6 +2880,19 @@ class KineticTAPNetBrushFusionRenderer:
                 15: (0.1, 1.0, 0.35), 16: (0.1, 1.0, 0.35), 27: (0.05, 0.95, 0.4), 28: (0.05, 0.95, 0.4),
                 "default": (0.1, 1.0, 0.35)
             }
+            is_tapnet_rainbow = True
+            filament_base = (1.0, 1.0, 1.0)
+        elif brush_color_mode in ["icecream_marbled_berry_confetti", "icecream_pink_cream_berry"]:
+            skeletal_palette = {
+                15: (1.0, 0.45, 0.68), 16: (1.0, 0.45, 0.68), # Soft Bubblegum Pink Outer Ribbons (Wrists)
+                13: (0.92, 0.72, 0.15), 14: (0.92, 0.72, 0.15), # Mustard / Golden Yellow Curves (Elbows)
+                27: (0.65, 0.08, 0.22), 28: (0.65, 0.08, 0.22), # Deep Berry Red / Burgundy Marbling (Ankles)
+                25: (0.45, 0.05, 0.15), 26: (0.45, 0.05, 0.15), # Dark Cherry / Wine Red (Knees)
+                11: (0.98, 0.95, 0.88), 12: (0.98, 0.95, 0.88), # Warm Cream / Vanilla White Core (Shoulders)
+                "default": (0.96, 0.75, 0.78) # Soft Ice Cream Swirl Tone
+            }
+            is_tapnet_rainbow = True # Tiny cyan, blue, green, orange, red, and purple confetti speckles
+            filament_base = (1.0, 1.0, 1.0)
         elif brush_color_mode in ["feather_fur_ivory_chestnut", "chocolate_fur_ivory_feather"]:
             skeletal_palette = {
                 15: (0.95, 0.93, 0.88), 16: (0.95, 0.93, 0.88), # Cream / Ivory Feathers (Wrists)
