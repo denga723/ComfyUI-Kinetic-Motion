@@ -586,7 +586,7 @@ class GeminiOmniModel:
                     ref_str = " ".join(ref_clauses)
                     sources_clauses.append(f"[# References {ref_str}]")
                     ref_ids_str = ", ".join(ref_img_ids)
-                    guiding_instructions.append(f"Render the moving brushstrokes with the oil paint texture, impasto brush marks, and color palette from {ref_ids_str}.")
+                    guiding_instructions.append(f"Render the active moving strokes with the physical textures and color palette from {ref_ids_str}. Strictly mirror the exact temporal decay, fading, and disappearance of strokes from {vid_ids[0]}.")
             elif task != "text_to_video":
                 # Image-to-Video mode: Image1 is the first frame, Video1 is motion reference
                 for p in inputs_payload:

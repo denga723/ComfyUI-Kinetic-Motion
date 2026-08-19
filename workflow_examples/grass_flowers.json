@@ -1040,7 +1040,6 @@
           "link": null
         },
         {
-          "filament_width": 5,
           "localized_name": "filament_width",
           "name": "filament_width",
           "type": "INT",
@@ -1493,7 +1492,7 @@
         "Node name for S&R": "PrimitiveStringMultiline"
       },
       "widgets_values": [
-        "Lush botanical meadow & biomorphic moss sculpture \u2014 dense wild green grass blades, intertwined mossy vegetation, and delicate organic filaments blooming with miniature yellow buttercups and vivid purple wildflower blossoms on a pure pitch-black background. High tactile detail with wet morning dew drops, rich organic chlorophyll greens, vibrant floral accents, and intricate cellular plant textures. Perform high-fidelity video style transfer on Video1 using the physical textures, layered botanical brush marks, impasto vegetation depth, and floral color palette of lush grass green, sunny yellow flowers, and purple wildflowers from Image1, Image2, Image3, and Image4. Strictly preserve the exact physical motion paths, trajectories, curves, velocity, and timing of the moving brushstrokes from Video1 without altering their structure or animation layout."
+        "Lush botanical meadow & biomorphic moss sculpture \u2014 dense wild green grass blades, intertwined mossy vegetation, and delicate organic filaments blooming with miniature yellow buttercups and vivid purple wildflower blossoms on a pure pitch-black background. High tactile detail with wet morning dew drops, rich organic chlorophyll greens, vibrant floral accents, and intricate cellular plant textures. Perform high-fidelity video style transfer on Video1 using the physical textures, layered botanical brush marks, impasto vegetation depth, and floral color palette of lush grass green, sunny yellow flowers, and purple wildflowers from Image1, Image2, Image3, and Image4. CRITICAL TEMPORAL FADING & MOTION SYNCHRONIZATION: The output video must strictly follow the kinetic + TAPNet fused brushstrokes of Video1 in real time. Whenever lines, curves, ribbons, or particle filaments in Video1 fade, decay, thin out, lift, or disappear, the corresponding grass blades, moss tendrils, and wildflower blooms MUST simultaneously fade out, dissolve, and disappear with the exact same transparency and decay rate. All negative space outside the active stroke paths of Video1 must remain pure pitch black empty void. Strictly preserve the exact physical trajectories, velocities, and timing of Video1 without altering its animation structure."
       ],
       "title": "Grass & Yellow/Purple Wildflowers Prompt"
     },
