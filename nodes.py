@@ -2712,6 +2712,8 @@ class KineticTAPNetBrushFusionRenderer:
                 "glow_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Luminescence bloom intensity"}),
                 "occlusion_pen_lift": (["enable", "disable"], {"default": "enable", "tooltip": "Naturally lift virtual brush and fade filaments when points become occluded"}),
                 "brush_color_mode": ([
+                    "feather_fur_ivory_chestnut",
+                    "chocolate_fur_ivory_feather",
                     "grass_yellow_purple_flowers",
                     "green_grass_yellow_purple",
                     "peach_pink_skyblue",
@@ -2876,7 +2878,16 @@ class KineticTAPNetBrushFusionRenderer:
                 15: (0.1, 1.0, 0.35), 16: (0.1, 1.0, 0.35), 27: (0.05, 0.95, 0.4), 28: (0.05, 0.95, 0.4),
                 "default": (0.1, 1.0, 0.35)
             }
-            is_tapnet_rainbow = True
+        elif brush_color_mode in ["feather_fur_ivory_chestnut", "chocolate_fur_ivory_feather"]:
+            skeletal_palette = {
+                15: (0.95, 0.93, 0.88), 16: (0.95, 0.93, 0.88), # Cream / Ivory Feathers (Wrists)
+                13: (0.58, 0.35, 0.20), 14: (0.58, 0.35, 0.20), # Warm Chestnut / Medium Brown (Elbows)
+                27: (0.30, 0.18, 0.12), 28: (0.30, 0.18, 0.12), # Dark Chocolate Brown (Ankles)
+                25: (0.74, 0.64, 0.54), 26: (0.74, 0.64, 0.54), # Muted Beige / Taupe Transitions (Knees)
+                11: (0.42, 0.26, 0.16), 12: (0.42, 0.26, 0.16), # Deep Chocolate Fur (Shoulders)
+                "default": (0.45, 0.28, 0.18)
+            }
+            filament_base = (0.98, 0.96, 0.92) # Delicate Ivory / Soft Off-White Feather Plumes & Highlights
         elif brush_color_mode in ["grass_yellow_purple_flowers", "green_grass_yellow_purple"]:
             skeletal_palette = {
                 15: (0.15, 0.92, 0.32), 16: (0.15, 0.92, 0.32), # Lush Meadow Grass Green (Wrists)
