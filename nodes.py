@@ -4507,8 +4507,9 @@ class HumanSegmentationExtractor:
 class DualCharacterMaskSeparator:
     """
     Pure Mask-Driven Dual Character Color Separator.
-    Takes the Human Segmentation Mask (both dancers together) and video frames,
-    then separates them by costume luminance into Character 1 (White Dancer) and Character 2 (Black Dancer).
+    Takes the Human Segmentation Mask (both characters together) and video frames,
+    then separates them into Character 1 (White costume - Red mask) and Character 2 (Black costume - Green mask),
+    with difference isolation to remove shared/overlapping regions and keep only the distinct parts.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -4518,7 +4519,8 @@ class DualCharacterMaskSeparator:
             },
             "optional": {
                 "human_segmentation_mask": (ANY_TYPE, {"tooltip": "Optional pre-segmented human mask containing both people (from HumanSegmentationExtractor)"}),
-                "luminance_threshold": ("INT", {"default": 110, "min": 20, "max": 230, "step": 1, "tooltip": "Luminance cutoff separating White Dancer (above) from Black Dancer (below)"}),
+                "luminance_threshold": ("INT", {"default": 120, "min": 20, "max": 230, "step": 1, "tooltip": "Luminance cutoff separating Character 1 (above) from Character 2 (below)"}),
+                "difference_isolation": (["enable", "disable"], {"default": "enable", "tooltip": "Delete shared/overlapping boundary regions and keep only the distinct parts of each character"}),
                 "morph_cleanup_kernel": ("INT", {"default": 5, "min": 3, "max": 21, "step": 2, "tooltip": "Morphological noise cleanup kernel size"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
                 "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
@@ -4554,13 +4556,14 @@ class DualCharacterMaskSeparator:
         return []
 
     def separate_masks(self, video_or_images, human_segmentation_mask=None, **kwargs):
-        luminance_threshold = kwargs.get("luminance_threshold", 110)
+        luminance_threshold = kwargs.get("luminance_threshold", 120)
+        diff_isolation = kwargs.get("difference_isolation", "enable")
         morph_cleanup_kernel = kwargs.get("morph_cleanup_kernel", 5)
         fps = kwargs.get("fps", 24)
         max_resolution = kwargs.get("max_resolution", "720p (Fastest)")
 
         try: luminance_threshold = int(luminance_threshold)
-        except: luminance_threshold = 110
+        except: luminance_threshold = 120
 
         try: morph_cleanup_kernel = int(morph_cleanup_kernel)
         except: morph_cleanup_kernel = 5
@@ -4593,7 +4596,6 @@ class DualCharacterMaskSeparator:
         if kernel_k % 2 == 0: kernel_k += 1
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
 
         out_c1 = []
         out_c2 = []
@@ -4616,31 +4618,47 @@ class DualCharacterMaskSeparator:
                 fg_raw = (gray > 18).astype(np.uint8) * 255
                 fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
 
-            # 2. White Dancer (Luminance > threshold inside Human Mask)
-            c1_raw = ((gray > luminance_threshold) & (fg_clean > 0)).astype(np.uint8) * 255
-            c1_clean = cv2.morphologyEx(c1_raw, cv2.MORPH_CLOSE, kernel)
+            # Calculate adaptive thresholding on human body pixels
+            h_pixels = gray[fg_clean > 0]
+            if len(h_pixels) > 50:
+                otsu_val, _ = cv2.threshold(h_pixels, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                split_val = int(0.5 * otsu_val + 0.5 * luminance_threshold)
+            else:
+                split_val = luminance_threshold
 
-            # 3. Black Dancer (Remaining Human Mask)
-            c2_raw = ((fg_clean > 0) & (c1_clean == 0)).astype(np.uint8) * 255
-            c2_clean = cv2.morphologyEx(c2_raw, cv2.MORPH_OPEN, kernel)
+            # 2. Character 1: White Costume (Red Mask in Preview)
+            c1_raw = ((gray >= split_val) & (fg_clean > 0)).astype(np.uint8) * 255
+            c1_clean = cv2.morphologyEx(c1_raw, cv2.MORPH_CLOSE, kernel)
+            c1_clean = cv2.morphologyEx(c1_clean, cv2.MORPH_OPEN, kernel_open)
+
+            # 3. Character 2: Black Costume (Green Mask in Preview)
+            c2_raw = ((fg_clean > 0) & (gray < split_val) & (gray > 4)).astype(np.uint8) * 255
+            c2_clean = cv2.morphologyEx(c2_raw, cv2.MORPH_CLOSE, kernel)
+            c2_clean = cv2.morphologyEx(c2_clean, cv2.MORPH_OPEN, kernel_open)
+
+            # 4. Difference Isolation: Delete shared / overlapping boundary regions, keep distinct parts
+            if str(diff_isolation).lower() not in ["false", "disable", "none", "0"]:
+                overlap = (c1_clean > 0) & (c2_clean > 0)
+                c1_clean[overlap] = 0
+                c2_clean[overlap] = 0
 
             c1_3c = cv2.cvtColor(c1_clean, cv2.COLOR_GRAY2RGB)
             c2_3c = cv2.cvtColor(c2_clean, cv2.COLOR_GRAY2RGB)
             fg_3c = cv2.cvtColor(fg_clean, cv2.COLOR_GRAY2RGB)
 
-            # 4. Diagnostic Grid (2x2)
+            # 5. Diagnostic Grid (2x2)
             grid = np.zeros((h_p * 2, w_p * 2, 3), dtype=np.uint8)
-            grid[0:h_p, 0:w_p] = frame # Top-Left: Original
-            grid[0:h_p, w_p:w_p*2] = fg_3c # Top-Right: Human Mask (Both Dancers)
+            grid[0:h_p, 0:w_p] = frame # Top-Left: Original / Cutout
+            grid[0:h_p, w_p:w_p*2] = fg_3c # Top-Right: Human Mask (Both Characters)
             
             # Tint Char 1 Red and Char 2 Green in preview
             c1_tint = c1_3c.copy()
             c1_tint[:, :, 1] = 0; c1_tint[:, :, 2] = 0
-            grid[h_p:h_p*2, 0:w_p] = c1_tint # Bottom-Left: White Dancer (Red Tint)
+            grid[h_p:h_p*2, 0:w_p] = c1_tint # Bottom-Left: Character 1 (Red Tint)
             
             c2_tint = c2_3c.copy()
             c2_tint[:, :, 0] = 0; c2_tint[:, :, 2] = 0
-            grid[h_p:h_p*2, w_p:w_p*2] = c2_tint # Bottom-Right: Black Dancer (Green Tint)
+            grid[h_p:h_p*2, w_p:w_p*2] = c2_tint # Bottom-Right: Character 2 (Green Tint)
 
             out_c1.append(c1_3c.astype(np.float32) / 255.0)
             out_c2.append(c2_3c.astype(np.float32) / 255.0)
