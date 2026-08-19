@@ -4309,11 +4309,11 @@ class DualPersonStagePipelineViewer:
         }
 
 
-class DualCharacterMaskSeparator:
+class HumanSegmentationExtractor:
     """
-    Pure Mask-Driven Dual Character Separator.
-    Isolates Character 1 (White Dancer) and Character 2 (Black Dancer)
-    purely from the segmentation mask and video luminance with zero reliance on 3D pose keypoints.
+    Step 1: Human Segmentation Extractor.
+    Segments both human dancers together out from the video, isolating them completely from the stage background.
+    Outputs the black-and-white Human Segmentation Mask and the isolated Cutout Video on dark canvas.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -4322,8 +4322,112 @@ class DualCharacterMaskSeparator:
                 "video_or_images": (ANY_TYPE, {"tooltip": "Input video stream or image batch"}),
             },
             "optional": {
+                "background_threshold": ("INT", {"default": 18, "min": 2, "max": 100, "step": 1, "tooltip": "Dark stage background cutoff threshold"}),
+                "edge_smoothing": ("INT", {"default": 5, "min": 1, "max": 21, "step": 2, "tooltip": "Morphological edge smoothing kernel"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("human_segmentation_mask", "segmented_human_cutout", "video_path")
+    FUNCTION = "extract_human_segmentation"
+    CATEGORY = "kinetic_motion"
+
+    def _extract_frames(self, inp):
+        if inp is None: return []
+        v_path = get_video_file_path(inp)
+        if v_path and os.path.exists(v_path):
+            frames = []
+            cap = cv2.VideoCapture(v_path)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+            return frames
+        if isinstance(inp, torch.Tensor):
+            t = inp
+            if len(t.shape) == 3: t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            return [np_frames[i] for i in range(np_frames.shape[0])]
+        if isinstance(inp, list):
+            res = []
+            for item in inp: res.extend(self._extract_frames(item))
+            return res
+        return []
+
+    def extract_human_segmentation(self, video_or_images, background_threshold=18, edge_smoothing=5, fps=24, max_resolution="720p (Fastest)"):
+        raw_frames = self._extract_frames(video_or_images)
+        if not raw_frames:
+            raise ValueError("[HumanSegmentationExtractor] No video frames found.")
+
+        h_orig, w_orig = raw_frames[0].shape[:2]
+        res_limits = {"540p (Draft)": 540, "720p (Fastest)": 720, "1080p (Standard)": 1080, "Original (No Limit)": 99999}
+        max_h = res_limits.get(max_resolution, 720)
+        scale = min(1.0, max_h / float(h_orig))
+        if scale < 0.99:
+            w_p = int(w_orig * scale)
+            h_p = int(h_orig * scale)
+            w_p = w_p if w_p % 2 == 0 else w_p - 1
+            h_p = h_p if h_p % 2 == 0 else h_p - 1
+            proc_frames = [cv2.resize(f, (w_p, h_p), interpolation=cv2.INTER_AREA) for f in raw_frames]
+        else:
+            w_p, h_p = w_orig, h_orig
+            proc_frames = raw_frames
+
+        num_frames = len(proc_frames)
+        kernel_k = max(3, int(edge_smoothing))
+        if kernel_k % 2 == 0: kernel_k += 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
+
+        out_masks = []
+        out_cutouts = []
+
+        for fi in range(num_frames):
+            frame = proc_frames[fi]
+            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+            fg_raw = (gray > background_threshold).astype(np.uint8) * 255
+            fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
+            fg_clean = cv2.GaussianBlur(fg_clean, (3, 3), 0)
+
+            mask_3c = cv2.cvtColor(fg_clean, cv2.COLOR_GRAY2RGB)
+            cutout = cv2.bitwise_and(frame, frame, mask=fg_clean)
+
+            out_masks.append(mask_3c.astype(np.float32) / 255.0)
+            out_cutouts.append(cutout.astype(np.float32) / 255.0)
+
+        temp_dir = folder_paths.get_temp_directory()
+        tmp_mp4 = os.path.join(temp_dir, f"human_segmentation_{int(time.time())}.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_w = cv2.VideoWriter(tmp_mp4, fourcc, float(fps), (w_p, h_p))
+        for f in out_masks:
+            out_w.write(cv2.cvtColor((f * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+        out_w.release()
+
+        return (
+            torch.from_numpy(np.array(out_masks, dtype=np.float32)),
+            torch.from_numpy(np.array(out_cutouts, dtype=np.float32)),
+            tmp_mp4
+        )
+
+
+class DualCharacterMaskSeparator:
+    """
+    Pure Mask-Driven Dual Character Color Separator.
+    Takes the Human Segmentation Mask (both dancers together) and video frames,
+    then separates them by costume luminance into Character 1 (White Dancer) and Character 2 (Black Dancer).
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE, {"tooltip": "Input video stream or segmented cutout"}),
+            },
+            "optional": {
+                "human_segmentation_mask": (ANY_TYPE, {"tooltip": "Optional pre-segmented human mask containing both people (from HumanSegmentationExtractor)"}),
                 "luminance_threshold": ("INT", {"default": 110, "min": 20, "max": 230, "step": 1, "tooltip": "Luminance cutoff separating White Dancer (above) from Black Dancer (below)"}),
-                "fg_threshold": ("INT", {"default": 18, "min": 5, "max": 80, "step": 1, "tooltip": "Dark background cutoff"}),
                 "morph_cleanup_kernel": ("INT", {"default": 5, "min": 3, "max": 21, "step": 2, "tooltip": "Morphological noise cleanup kernel size"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
                 "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
@@ -4331,7 +4435,7 @@ class DualCharacterMaskSeparator:
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING")
-    RETURN_NAMES = ("char1_mask_white", "char2_mask_black", "total_foreground_mask", "diagnostic_grid", "video_path")
+    RETURN_NAMES = ("char1_mask_white", "char2_mask_black", "human_segmentation_mask", "diagnostic_grid", "video_path")
     FUNCTION = "separate_masks"
     CATEGORY = "kinetic_motion"
 
@@ -4358,8 +4462,10 @@ class DualCharacterMaskSeparator:
             return res
         return []
 
-    def separate_masks(self, video_or_images, luminance_threshold=110, fg_threshold=18, morph_cleanup_kernel=5, fps=24, max_resolution="720p (Fastest)"):
+    def separate_masks(self, video_or_images, human_segmentation_mask=None, luminance_threshold=110, morph_cleanup_kernel=5, fps=24, max_resolution="720p (Fastest)"):
         raw_frames = self._extract_frames(video_or_images)
+        human_mask_frames = self._extract_frames(human_segmentation_mask) if human_segmentation_mask is not None else []
+
         if not raw_frames:
             raise ValueError("[DualCharacterMaskSeparator] No video frames found.")
 
@@ -4384,22 +4490,30 @@ class DualCharacterMaskSeparator:
 
         out_c1 = []
         out_c2 = []
-        out_fg = []
+        out_hm = []
         out_grid = []
 
         for fi in range(num_frames):
             frame = proc_frames[fi]
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
 
-            # 1. Total foreground
-            fg_raw = (gray > fg_threshold).astype(np.uint8) * 255
-            fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
+            # 1. Total Human Segmentation Mask
+            if human_mask_frames and fi < len(human_mask_frames):
+                m_in = human_mask_frames[fi]
+                if len(m_in.shape) == 3: m_gray = cv2.cvtColor(m_in, cv2.COLOR_RGB2GRAY)
+                else: m_gray = m_in
+                if m_gray.shape[:2] != (h_p, w_p):
+                    m_gray = cv2.resize(m_gray, (w_p, h_p), interpolation=cv2.INTER_NEAREST)
+                fg_clean = ((m_gray > 10).astype(np.uint8)) * 255
+            else:
+                fg_raw = (gray > 18).astype(np.uint8) * 255
+                fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
 
-            # 2. White Dancer (Luminance > threshold)
+            # 2. White Dancer (Luminance > threshold inside Human Mask)
             c1_raw = ((gray > luminance_threshold) & (fg_clean > 0)).astype(np.uint8) * 255
             c1_clean = cv2.morphologyEx(c1_raw, cv2.MORPH_CLOSE, kernel)
 
-            # 3. Black Dancer (Remaining foreground)
+            # 3. Black Dancer (Remaining Human Mask)
             c2_raw = ((fg_clean > 0) & (c1_clean == 0)).astype(np.uint8) * 255
             c2_clean = cv2.morphologyEx(c2_raw, cv2.MORPH_OPEN, kernel)
 
@@ -4410,20 +4524,20 @@ class DualCharacterMaskSeparator:
             # 4. Diagnostic Grid (2x2)
             grid = np.zeros((h_p * 2, w_p * 2, 3), dtype=np.uint8)
             grid[0:h_p, 0:w_p] = frame # Top-Left: Original
-            grid[0:h_p, w_p:w_p*2] = fg_3c # Top-Right: Total Foreground
+            grid[0:h_p, w_p:w_p*2] = fg_3c # Top-Right: Human Mask (Both Dancers)
             
             # Tint Char 1 Red and Char 2 Green in preview
             c1_tint = c1_3c.copy()
             c1_tint[:, :, 1] = 0; c1_tint[:, :, 2] = 0
-            grid[h_p:h_p*2, 0:w_p] = c1_tint # Bottom-Left: Char 1 (Red Tint)
+            grid[h_p:h_p*2, 0:w_p] = c1_tint # Bottom-Left: White Dancer (Red Tint)
             
             c2_tint = c2_3c.copy()
             c2_tint[:, :, 0] = 0; c2_tint[:, :, 2] = 0
-            grid[h_p:h_p*2, w_p:w_p*2] = c2_tint # Bottom-Right: Char 2 (Green Tint)
+            grid[h_p:h_p*2, w_p:w_p*2] = c2_tint # Bottom-Right: Black Dancer (Green Tint)
 
             out_c1.append(c1_3c.astype(np.float32) / 255.0)
             out_c2.append(c2_3c.astype(np.float32) / 255.0)
-            out_fg.append(fg_3c.astype(np.float32) / 255.0)
+            out_hm.append(fg_3c.astype(np.float32) / 255.0)
             out_grid.append(grid.astype(np.float32) / 255.0)
 
         temp_dir = folder_paths.get_temp_directory()
@@ -4437,7 +4551,7 @@ class DualCharacterMaskSeparator:
         return (
             torch.from_numpy(np.array(out_c1, dtype=np.float32)),
             torch.from_numpy(np.array(out_c2, dtype=np.float32)),
-            torch.from_numpy(np.array(out_fg, dtype=np.float32)),
+            torch.from_numpy(np.array(out_hm, dtype=np.float32)),
             torch.from_numpy(np.array(out_grid, dtype=np.float32)),
             tmp_mp4
         )
@@ -4815,15 +4929,16 @@ class DualCharacterPhysicalCompositor:
 
 class DualPathPipelineViewer:
     """
-    Dual-Path 7-Stage Synchronized Pipeline HUD Viewer.
-    Composites the entire mask-driven dual path architecture into a clean, synchronous grid:
+    Dual-Path 8-Stage Synchronized Pipeline HUD Viewer.
+    Composites the entire mask-driven dual path architecture into a clean, synchronous 2x4 grid:
       1. Original Ballet Duet Video
-      2. Char 1 Mask (White Dancer)
-      3. Char 2 Mask (Black Dancer)
-      4. Path 1: Char 1 Red Kinetic + Yellow TAPNet Layer
-      5. Path 2: Char 2 Green Kinetic + Blue TAPNet Layer
-      6. Fused Master Duet Canvas
-      7. Gemini Omni Final Masterpiece Video
+      2. Both Dancers Human Segmentation
+      3. Char 1 Mask (White Dancer)
+      4. Char 2 Mask (Black Dancer)
+      5. Path 1: Char 1 Red Kinetic + Yellow TAPNet Layer
+      6. Path 2: Char 2 Green Kinetic + Blue TAPNet Layer
+      7. Fused Master Duet Canvas
+      8. Gemini Omni Final Masterpiece Video
     """
     def __init__(self):
         self.output_dir = folder_paths.get_output_directory()
@@ -4834,12 +4949,13 @@ class DualPathPipelineViewer:
         return {
             "required": {
                 "original_video": (ANY_TYPE, {"tooltip": "1. Original Dual-Dancer Video"}),
-                "char1_mask_white": (ANY_TYPE, {"tooltip": "2. Char 1 Mask (White Dancer)"}),
-                "char2_mask_black": (ANY_TYPE, {"tooltip": "3. Char 2 Mask (Black Dancer)"}),
-                "char1_layer_red_yellow": (ANY_TYPE, {"tooltip": "4. Path 1: Char 1 Red + Yellow Layer"}),
-                "char2_layer_green_blue": (ANY_TYPE, {"tooltip": "5. Path 2: Char 2 Green + Blue Layer"}),
-                "fused_duet_canvas": (ANY_TYPE, {"tooltip": "6. Fused Master Duet Canvas"}),
-                "gemini_omni_artwork": (ANY_TYPE, {"tooltip": "7. Gemini Omni Final Masterpiece Video"}),
+                "human_segmentation": (ANY_TYPE, {"tooltip": "2. Both Dancers Human Segmentation"}),
+                "char1_mask_white": (ANY_TYPE, {"tooltip": "3. Char 1 Mask (White Dancer)"}),
+                "char2_mask_black": (ANY_TYPE, {"tooltip": "4. Char 2 Mask (Black Dancer)"}),
+                "char1_layer_red_yellow": (ANY_TYPE, {"tooltip": "5. Path 1: Char 1 Red + Yellow Layer"}),
+                "char2_layer_green_blue": (ANY_TYPE, {"tooltip": "6. Path 2: Char 2 Green + Blue Layer"}),
+                "fused_duet_canvas": (ANY_TYPE, {"tooltip": "7. Fused Master Duet Canvas"}),
+                "gemini_omni_artwork": (ANY_TYPE, {"tooltip": "8. Gemini Omni Final Masterpiece Video"}),
             },
             "optional": {
                 "layout": (["grid_2x4", "strip_horizontal"], {"default": "grid_2x4"}),
@@ -4883,6 +4999,7 @@ class DualPathPipelineViewer:
     def create_pipeline_preview(
         self,
         original_video: Any,
+        human_segmentation: Any,
         char1_mask_white: Any,
         char2_mask_black: Any,
         char1_layer_red_yellow: Any,
@@ -4898,6 +5015,7 @@ class DualPathPipelineViewer:
     ):
         raw_inputs = [
             original_video,
+            human_segmentation,
             char1_mask_white,
             char2_mask_black,
             char1_layer_red_yellow,
@@ -4908,16 +5026,18 @@ class DualPathPipelineViewer:
 
         stage_labels = [
             "1. Original Ballet Duet",
-            "2. Char 1 Mask (White)",
-            "3. Char 2 Mask (Black)",
-            "4. Path 1: Red + Yellow (Char 1)",
-            "5. Path 2: Green + Blue (Char 2)",
-            "6. Fused Master Canvas",
-            "7. Gemini Omni Final Art"
+            "2. Both Dancers Mask",
+            "3. Char 1 Mask (White)",
+            "4. Char 2 Mask (Black)",
+            "5. Path 1: Red + Yellow",
+            "6. Path 2: Green + Blue",
+            "7. Fused Master Canvas",
+            "8. Gemini Omni Final Art"
         ]
 
         stage_colors = [
             (220, 220, 220), # Gray
+            (0, 230, 255),   # Cyan
             (240, 240, 255), # White
             (120, 120, 140), # Dark
             (255, 42, 77),   # Red
@@ -4940,7 +5060,7 @@ class DualPathPipelineViewer:
             if layout == "grid_2x4":
                 canvas_w, canvas_h = cell_w * 4, cell_h * 2
                 canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
-                for i in range(7):
+                for i in range(8):
                     row = i // 4
                     col = i % 4
                     stream = parsed[i]
@@ -4952,9 +5072,9 @@ class DualPathPipelineViewer:
                         cv2.putText(f_r, stage_labels[i], (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (255, 255, 255), 1, cv2.LINE_AA)
                     canvas[row*cell_h:(row+1)*cell_h, col*cell_w:(col+1)*cell_w] = f_r
             else: # strip_horizontal
-                canvas_w, canvas_h = cell_w * 7, cell_h
+                canvas_w, canvas_h = cell_w * 8, cell_h
                 canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
-                for i in range(7):
+                for i in range(8):
                     stream = parsed[i]
                     f_np = stream[fi] if fi < len(stream) else np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
                     f_r = cv2.resize(f_np, (cell_w, cell_h), interpolation=cv2.INTER_AREA)
@@ -5038,6 +5158,7 @@ NODE_CLASS_MAPPINGS = {
     "DualPersonTAPNetTracker": DualPersonTAPNetTracker,
     "DualPersonBrushFusionRenderer": DualPersonBrushFusionRenderer,
     "DualPersonStagePipelineViewer": DualPersonStagePipelineViewer,
+    "HumanSegmentationExtractor": HumanSegmentationExtractor,
     "DualCharacterMaskSeparator": DualCharacterMaskSeparator,
     "SingleCharacterMaskKineticRenderer": SingleCharacterMaskKineticRenderer,
     "DualCharacterPhysicalCompositor": DualCharacterPhysicalCompositor,
@@ -5068,8 +5189,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DualPersonTAPNetTracker": "Dual-Person TAPNet Point Tracker (Yellow + Blue Points)",
     "DualPersonBrushFusionRenderer": "Dual-Person Brush Fusion Renderer (Red/Yellow vs Green/Blue)",
     "DualPersonStagePipelineViewer": "Dual-Person 9-Stage Pipeline Viewer (All Maps Synchronizer)",
-    "DualCharacterMaskSeparator": "Dual-Character Mask Separator (White vs Black Dancers)",
+    "HumanSegmentationExtractor": "Human Segmentation Extractor (Both Dancers Together)",
+    "DualCharacterMaskSeparator": "Dual-Character Color Separator (White vs Black Dancers)",
     "SingleCharacterMaskKineticRenderer": "Single-Character Mask Kinetic Renderer (Splines + TAPNet)",
     "DualCharacterPhysicalCompositor": "Dual-Character Physical Compositor (Master Duet Fuser)",
-    "DualPathPipelineViewer": "Dual-Path Duet Pipeline Viewer (7-Stage Synchronizer)"
+    "DualPathPipelineViewer": "Dual-Path Duet Pipeline Viewer (8-Stage Synchronizer)"
 }
