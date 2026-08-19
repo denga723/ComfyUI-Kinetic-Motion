@@ -4309,11 +4309,32 @@ class DualPersonStagePipelineViewer:
         }
 
 
+_TORCH_SEGMENTATION_MODEL = None
+_TORCH_SEGMENTATION_TRANSFORMS = None
+
+
+def get_deep_human_segmentation_model():
+    global _TORCH_SEGMENTATION_MODEL, _TORCH_SEGMENTATION_TRANSFORMS
+    if _TORCH_SEGMENTATION_MODEL is None:
+        try:
+            from torchvision.models.segmentation import lraspp_mobilenet_v3_large, LRASPP_MobileNet_V3_Large_Weights
+            weights = LRASPP_MobileNet_V3_Large_Weights.DEFAULT
+            _TORCH_SEGMENTATION_TRANSFORMS = weights.transforms()
+            model = lraspp_mobilenet_v3_large(weights=weights).eval()
+            device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+            _TORCH_SEGMENTATION_MODEL = (model.to(device), device)
+            print(f"[HumanSegmentationExtractor] Loaded Deep Human Segmentation (LRASPP MobileNetV3) on {device}!")
+        except Exception as e:
+            print(f"[HumanSegmentationExtractor] Warning loading PyTorch segmentation: {e}")
+            _TORCH_SEGMENTATION_MODEL = (None, 'cpu')
+    return _TORCH_SEGMENTATION_MODEL, _TORCH_SEGMENTATION_TRANSFORMS
+
+
 class HumanSegmentationExtractor:
     """
-    Step 1: Human Segmentation Extractor.
-    Extracts the human dancers out from the video, placing them on a 100% pitch-black background
-    with an illuminated cyan boundary contour outline, matching the original Kinetic Stage 1 segmentation aesthetic.
+    Step 1: Deep Human Segmentation Extractor.
+    Extracts the human dancers out from the video using DeepLab/LRASPP neural segmentation,
+    placing them on a 100% pitch-black background with an illuminated cyan boundary contour outline.
     """
     @classmethod
     def INPUT_TYPES(s):
@@ -4322,7 +4343,7 @@ class HumanSegmentationExtractor:
                 "video_or_images": (ANY_TYPE, {"tooltip": "Input video stream or image batch"}),
             },
             "optional": {
-                "background_threshold": ("INT", {"default": 14, "min": 2, "max": 100, "step": 1, "tooltip": "Dark stage background cutoff threshold"}),
+                "confidence_threshold": ("FLOAT", {"default": 0.25, "min": 0.05, "max": 0.95, "step": 0.05, "tooltip": "Human segmentation confidence cutoff threshold"}),
                 "contour_outline": (["enable", "disable"], {"default": "enable", "tooltip": "Draw glowing cyan boundary contour around extracted dancers"}),
                 "edge_smoothing": ("INT", {"default": 5, "min": 1, "max": 21, "step": 2, "tooltip": "Morphological edge smoothing kernel"}),
                 "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
@@ -4359,17 +4380,17 @@ class HumanSegmentationExtractor:
         return []
 
     def extract_human_segmentation(self, video_or_images, **kwargs):
-        background_threshold = kwargs.get("background_threshold", 14)
+        conf_thresh = kwargs.get("confidence_threshold", kwargs.get("background_threshold", 0.25))
         contour_outline = kwargs.get("contour_outline", "enable")
         edge_smoothing = kwargs.get("edge_smoothing", 5)
         fps = kwargs.get("fps", 24)
         max_resolution = kwargs.get("max_resolution", "720p (Fastest)")
 
-        # Ultra-robust type coercion to prevent any ComfyUI widget mismatch errors
         try:
-            background_threshold = int(background_threshold)
+            conf_thresh = float(conf_thresh)
+            if conf_thresh > 1.0: conf_thresh = conf_thresh / 100.0
         except (ValueError, TypeError):
-            background_threshold = 14
+            conf_thresh = 0.25
 
         try:
             edge_smoothing = int(edge_smoothing)
@@ -4410,26 +4431,44 @@ class HumanSegmentationExtractor:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
+        (seg_model_pack, device), seg_transforms = get_deep_human_segmentation_model()
+
         out_stage1 = []
         out_cutouts = []
         out_masks = []
 
         for fi in range(num_frames):
             frame = proc_frames[fi]
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+            dancer_mask = None
 
-            # Isolate the dancers from background
-            fg_raw = (gray > background_threshold).astype(np.uint8) * 255
-            fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
-            fg_clean = cv2.morphologyEx(fg_clean, cv2.MORPH_OPEN, kernel_open)
+            # 1. Neural Human Segmentation with PyTorch DeepLab/LRASPP
+            if seg_model_pack is not None:
+                try:
+                    pil_img = Image.fromarray(frame)
+                    inp = seg_transforms(pil_img).unsqueeze(0).to(device)
+                    with torch.no_grad():
+                        out = seg_model_pack(inp)['out']
+                    probs = torch.softmax(out, dim=1)
+                    # Class 15 is 'person'
+                    person_prob = probs[0, 15].cpu().numpy()
+                    person_mask_f = cv2.resize(person_prob, (w_p, h_p), interpolation=cv2.INTER_LINEAR)
+                    dancer_mask = (person_mask_f > conf_thresh).astype(np.uint8) * 255
+                except Exception as e:
+                    dancer_mask = None
 
-            # Connected component filtering to keep only human dancers
-            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_clean)
-            dancer_mask = np.zeros_like(fg_clean)
-            for label in range(1, num_labels):
-                if stats[label, cv2.CC_STAT_AREA] > 200:
-                    dancer_mask[labels == label] = 255
+            # Fallback if neural segmentation failed or not loaded
+            if dancer_mask is None or np.count_nonzero(dancer_mask) == 0:
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                fg_raw = (gray > 14).astype(np.uint8) * 255
+                fg_clean = cv2.morphologyEx(fg_raw, cv2.MORPH_CLOSE, kernel)
+                fg_clean = cv2.morphologyEx(fg_clean, cv2.MORPH_OPEN, kernel_open)
+                num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_clean)
+                dancer_mask = np.zeros_like(fg_clean)
+                for label in range(1, num_labels):
+                    if stats[label, cv2.CC_STAT_AREA] > 200:
+                        dancer_mask[labels == label] = 255
 
+            dancer_mask = cv2.morphologyEx(dancer_mask, cv2.MORPH_CLOSE, kernel)
             dancer_mask = cv2.dilate(dancer_mask, kernel_open)
 
             # 1. Clean Cutout on pure pitch-black background [0, 0, 0]
@@ -4514,7 +4553,21 @@ class DualCharacterMaskSeparator:
             return res
         return []
 
-    def separate_masks(self, video_or_images, human_segmentation_mask=None, luminance_threshold=110, morph_cleanup_kernel=5, fps=24, max_resolution="720p (Fastest)"):
+    def separate_masks(self, video_or_images, human_segmentation_mask=None, **kwargs):
+        luminance_threshold = kwargs.get("luminance_threshold", 110)
+        morph_cleanup_kernel = kwargs.get("morph_cleanup_kernel", 5)
+        fps = kwargs.get("fps", 24)
+        max_resolution = kwargs.get("max_resolution", "720p (Fastest)")
+
+        try: luminance_threshold = int(luminance_threshold)
+        except: luminance_threshold = 110
+
+        try: morph_cleanup_kernel = int(morph_cleanup_kernel)
+        except: morph_cleanup_kernel = 5
+
+        try: fps = int(fps)
+        except: fps = 24
+
         raw_frames = self._extract_frames(video_or_images)
         human_mask_frames = self._extract_frames(human_segmentation_mask) if human_segmentation_mask is not None else []
 
@@ -4523,7 +4576,7 @@ class DualCharacterMaskSeparator:
 
         h_orig, w_orig = raw_frames[0].shape[:2]
         res_limits = {"540p (Draft)": 540, "720p (Fastest)": 720, "1080p (Standard)": 1080, "Original (No Limit)": 99999}
-        max_h = res_limits.get(max_resolution, 720)
+        max_h = res_limits.get(str(max_resolution), 720)
         scale = min(1.0, max_h / float(h_orig))
         if scale < 0.99:
             w_p = int(w_orig * scale)
@@ -4538,6 +4591,8 @@ class DualCharacterMaskSeparator:
         num_frames = len(proc_frames)
         kernel_k = max(3, int(morph_cleanup_kernel))
         if kernel_k % 2 == 0: kernel_k += 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_k, kernel_k))
 
         out_c1 = []
