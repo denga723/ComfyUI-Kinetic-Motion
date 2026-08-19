@@ -4358,14 +4358,41 @@ class HumanSegmentationExtractor:
             return res
         return []
 
-    def extract_human_segmentation(self, video_or_images, background_threshold=14, contour_outline="enable", edge_smoothing=5, fps=24, max_resolution="720p (Fastest)"):
+    def extract_human_segmentation(self, video_or_images, **kwargs):
+        background_threshold = kwargs.get("background_threshold", 14)
+        contour_outline = kwargs.get("contour_outline", "enable")
+        edge_smoothing = kwargs.get("edge_smoothing", 5)
+        fps = kwargs.get("fps", 24)
+        max_resolution = kwargs.get("max_resolution", "720p (Fastest)")
+
+        # Ultra-robust type coercion to prevent any ComfyUI widget mismatch errors
+        try:
+            background_threshold = int(background_threshold)
+        except (ValueError, TypeError):
+            background_threshold = 14
+
+        try:
+            edge_smoothing = int(edge_smoothing)
+        except (ValueError, TypeError):
+            edge_smoothing = 5
+
+        try:
+            fps = int(fps)
+        except (ValueError, TypeError):
+            fps = 24
+
+        if str(contour_outline).lower() in ["false", "disable", "none", "0"]:
+            contour_outline = "disable"
+        else:
+            contour_outline = "enable"
+
         raw_frames = self._extract_frames(video_or_images)
         if not raw_frames:
             raise ValueError("[HumanSegmentationExtractor] No video frames found.")
 
         h_orig, w_orig = raw_frames[0].shape[:2]
         res_limits = {"540p (Draft)": 540, "720p (Fastest)": 720, "1080p (Standard)": 1080, "Original (No Limit)": 99999}
-        max_h = res_limits.get(max_resolution, 720)
+        max_h = res_limits.get(str(max_resolution), 720)
         scale = min(1.0, max_h / float(h_orig))
         if scale < 0.99:
             w_p = int(w_orig * scale)
