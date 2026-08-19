@@ -789,40 +789,54 @@ class GeminiOmniModel:
                 print("OMNI AUTH ERROR: No token or key in fetch_omni")
                 return (None, None, None, {"error": "Authentication failed. No token or key."})
 
-            try:
-                async with session.post(url, headers=headers, json=req_body) as response:
-                    if response.status == 200:
-                        resp_json = await response.json()
-                        video_uri = None
-                        video_b64 = None
-                        text_parts = []
-                        steps = resp_json.get("steps", [])
-                        for step in steps:
-                            for content in step.get("content", []):
-                                if "text" in content:
-                                    text_parts.append(content.get("text", ""))
-                                if content.get("type") == "video":
-                                    if "uri" in content:
-                                        video_uri = content.get("uri")
-                                    if "data" in content:
-                                        video_b64 = content.get("data")
-                        
-                        combined_text = "\n".join(text_parts) if text_parts else f"[Generated video for prompt: {payload.text}]"
-                        return (combined_text, video_b64, video_uri, resp_json)
-                    else:
-                        error_text = await response.text()
-                        print(f"OMNI API ERROR {response.status}: {error_text}")
-                        user_msg = f"[API Error ({response.status})]: {error_text}"
-                        if "unsupported model interaction" in error_text.lower():
-                            user_msg = (
-                                f"[Gemini Omni Model Error]: The selected model '{model_name}' does not support video generation/editing via the Interactions API.\n"
-                                f"• For Video Generation & Stylization (Video-to-Video / Image-to-Video), please select 'gemini-omni-flash-preview'.\n"
-                                f"• If you want text analysis / multimodal reasoning with '{model_name}', use the 'Gemini Execution Node' instead."
-                            )
-                        return (user_msg, None, None, {"error": error_text, "code": response.status, "friendly_message": user_msg})
-            except Exception as e:
-                print(f"OMNI INTERNAL EXCEPTION: {str(e)}")
-                return (f"[Error]: {str(e)}", None, None, {"error": str(e)})
+            max_retries = 4
+            for attempt in range(max_retries):
+                try:
+                    async with session.post(url, headers=headers, json=req_body) as response:
+                        if response.status == 200:
+                            resp_json = await response.json()
+                            video_uri = None
+                            video_b64 = None
+                            text_parts = []
+                            steps = resp_json.get("steps", [])
+                            for step in steps:
+                                for content in step.get("content", []):
+                                    if "text" in content:
+                                        text_parts.append(content.get("text", ""))
+                                    if content.get("type") == "video":
+                                        if "uri" in content:
+                                            video_uri = content.get("uri")
+                                        if "data" in content:
+                                            video_b64 = content.get("data")
+                            
+                            combined_text = "\n".join(text_parts) if text_parts else f"[Generated video for prompt: {payload.text}]"
+                            return (combined_text, video_b64, video_uri, resp_json)
+                        elif response.status in [429, 503, 500] and attempt < max_retries - 1:
+                            wait_sec = 3.0 * (2 ** attempt)
+                            print(f"[GeminiOmniModel] API returned {response.status} (Rate limit / Too Many Requests). Automatically retrying in {wait_sec:.1f}s (Attempt {attempt+1}/{max_retries})...")
+                            await asyncio.sleep(wait_sec)
+                            continue
+                        else:
+                            error_text = await response.text()
+                            print(f"OMNI API ERROR {response.status}: {error_text}")
+                            user_msg = f"[API Error ({response.status})]: {error_text}"
+                            if "unsupported model interaction" in error_text.lower():
+                                user_msg = (
+                                    f"[Gemini Omni Model Error]: The selected model '{model_name}' does not support video generation/editing via the Interactions API.\n"
+                                    f"• For Video Generation & Stylization (Video-to-Video / Image-to-Video), please select 'gemini-omni-flash-preview'.\n"
+                                    f"• If you want text analysis / multimodal reasoning with '{model_name}', use the 'Gemini Execution Node' instead."
+                                )
+                            elif response.status == 429:
+                                user_msg = "[Gemini Omni Model Error]: API Rate Limit (Too Many Requests / 429). Please wait a few seconds before re-queueing."
+                            return (user_msg, None, None, {"error": error_text, "code": response.status, "friendly_message": user_msg})
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait_sec = 3.0 * (2 ** attempt)
+                        print(f"[GeminiOmniModel] Exception {e}. Retrying in {wait_sec:.1f}s...")
+                        await asyncio.sleep(wait_sec)
+                        continue
+                    print(f"OMNI INTERNAL EXCEPTION: {str(e)}")
+                    return (f"[Error]: {str(e)}", None, None, {"error": str(e)})
 
         async def process_batch():
             async with aiohttp.ClientSession() as session:
