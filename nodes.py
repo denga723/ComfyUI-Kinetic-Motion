@@ -4562,14 +4562,36 @@ class DualCharacterMaskSeparator:
         fps = kwargs.get("fps", 24)
         max_resolution = kwargs.get("max_resolution", "720p (Fastest)")
 
-        try: luminance_threshold = int(luminance_threshold)
-        except: luminance_threshold = 120
+        # Intelligent shifted parameter detection for legacy cached ComfyUI node graphs
+        if isinstance(fps, str) and any(k in fps for k in ["720p", "1080p", "540p", "Original"]):
+            max_resolution = fps
+            if isinstance(morph_cleanup_kernel, (int, float)) and int(morph_cleanup_kernel) in [12, 15, 24, 30, 60]:
+                fps = int(morph_cleanup_kernel)
+                if isinstance(diff_isolation, (int, float)):
+                    morph_cleanup_kernel = int(diff_isolation)
+                    diff_isolation = "enable"
+            else:
+                fps = 24
 
-        try: morph_cleanup_kernel = int(morph_cleanup_kernel)
-        except: morph_cleanup_kernel = 5
+        try:
+            luminance_threshold = int(luminance_threshold)
+        except (ValueError, TypeError):
+            luminance_threshold = 120
 
-        try: fps = int(fps)
-        except: fps = 24
+        try:
+            morph_cleanup_kernel = int(morph_cleanup_kernel)
+        except (ValueError, TypeError):
+            morph_cleanup_kernel = 5
+
+        try:
+            fps = int(fps)
+        except (ValueError, TypeError):
+            fps = 24
+
+        if str(diff_isolation).lower() in ["false", "disable", "none", "0"]:
+            diff_isolation = "disable"
+        else:
+            diff_isolation = "enable"
 
         raw_frames = self._extract_frames(video_or_images)
         human_mask_frames = self._extract_frames(human_segmentation_mask) if human_segmentation_mask is not None else []
