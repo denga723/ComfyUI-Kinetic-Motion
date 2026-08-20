@@ -5580,14 +5580,24 @@ class THFMProceduralMotionRenderer:
             return (torch.from_numpy(blank), torch.from_numpy(blank), torch.from_numpy(blank), "")
         
         acc_canvas = np.zeros((h, w, 3), dtype=np.float32)
+        acc_ribbons = np.zeros((h, w, 3), dtype=np.float32)
+        acc_particles = np.zeros((h, w, 3), dtype=np.float32)
+        
         out_motion_field_frames = []
         ribbons_layer_frames = []
         particles_layer_frames = []
         
-        base_seed_count = int(1800 * particle_density)
+        base_seed_count = max(400, int(1800 * particle_density))
+        target_particle_count = max(300, int(1200 * particle_density))
+        
+        # Persistent Lagrangian particles across frames
+        active_particles = []
         
         for t in range(num_frames):
             acc_canvas *= temporal_decay
+            acc_ribbons *= temporal_decay
+            acc_particles *= temporal_decay
+            
             cur_flow = flow_fields[t]
             cur_mag = mag_fields[t]
             cur_thfm = thfm_frames[t]
@@ -5597,95 +5607,175 @@ class THFMProceduralMotionRenderer:
             cur_ribbon_layer = np.zeros((h, w, 3), dtype=np.float32)
             cur_particle_layer = np.zeros((h, w, 3), dtype=np.float32)
             
-            # Identify active regions
+            # 1. Normalize flow magnitude for adaptive sensitivity
+            pos_mags = cur_mag[cur_mag > 0.01]
+            p95_mag = float(np.percentile(pos_mags, 95)) if len(pos_mags) > 10 else 1.0
+            norm_mag = np.clip(cur_mag / max(0.1, p95_mag), 0.0, 1.0)
+            
             thfm_lum = np.max(cur_thfm, axis=-1).astype(np.float32) / 255.0
-            activity_weights = (0.5 * thfm_lum + 0.5 * (cur_mag / 15.0)).flatten()
-            valid_indices = np.where(activity_weights > 0.05)[0]
+            body_mask = (thfm_lum > 0.03).astype(np.float32)
             
-            if len(valid_indices) > 0:
-                probs = activity_weights[valid_indices]
-                prob_sum = probs.sum()
-                if prob_sum > 0:
-                    probs = probs / prob_sum
-                    sample_count = min(base_seed_count, len(valid_indices))
-                    chosen_flat = np.random.choice(valid_indices, sample_count, p=probs, replace=False)
-                    seed_ys, seed_xs = np.unravel_index(chosen_flat, (h, w))
+            # Adaptive emission probability weights
+            activity_weights = (0.30 * thfm_lum + 0.70 * norm_mag).flatten()
+            
+            # Lower threshold dynamically if motion is subtle
+            weight_max = float(activity_weights.max()) if len(activity_weights) > 0 else 0.0
+            emit_threshold = min(0.02, max(0.001, weight_max * 0.15))
+            
+            valid_indices = np.where(activity_weights > emit_threshold)[0]
+            
+            # Robust fallback: if valid indices is too small, use body silhouette mask
+            if len(valid_indices) < 100:
+                body_indices = np.where(body_mask.flatten() > 0.1)[0]
+                if len(body_indices) >= 50:
+                    valid_indices = body_indices
                 else:
-                    seed_ys, seed_xs = [], []
+                    # Uniform canvas fallback
+                    valid_indices = np.arange(h * w)
+            
+            # Calculate sampling probabilities
+            probs = activity_weights[valid_indices]
+            prob_sum = probs.sum()
+            if prob_sum > 0:
+                probs = probs / prob_sum
             else:
-                seed_ys, seed_xs = [], []
+                probs = np.ones(len(valid_indices), dtype=np.float32) / len(valid_indices)
             
-            # Render ribbons / streamlines
-            if graphics_mode in ["advected_kinetic_ribbons", "dense_vortex_filaments", "hybrid_ribbons_and_particles"]:
-                for s_idx in range(len(seed_xs)):
-                    sx, sy = float(seed_xs[s_idx]), float(seed_ys[s_idx])
-                    base_rgb = cur_thfm[int(sy), int(sx)]
-                    mag_val = cur_mag[int(sy), int(sx)]
-                    
-                    mapped_rgb = np.array(self._map_color(base_rgb, color_source, mag_val), dtype=np.float32) * thfm_color_intensity
-                    
-                    curr_x, curr_y = sx, sy
-                    pts = [(int(round(curr_x)), int(round(curr_y)))]
-                    
-                    steps = streamline_length if graphics_mode != "dense_vortex_filaments" else int(streamline_length * 1.5)
-                    for step in range(steps):
-                        ix, iy = int(round(curr_x)), int(round(curr_y))
-                        if ix < 0 or ix >= w or iy < 0 or iy >= h:
-                            break
-                        fu, fv = u[iy, ix], v[iy, ix]
-                        fmag = cur_mag[iy, ix]
-                        if fmag < 0.1:
-                            break
-                        
-                        turb_x = math.sin(curr_y * 0.05 + t * 0.1) * flow_turbulence * 2.0
-                        turb_y = math.cos(curr_x * 0.05 + t * 0.1) * flow_turbulence * 2.0
-                        
-                        curr_x += (fu * advection_speed + turb_x)
-                        curr_y += (fv * advection_speed + turb_y)
-                        pts.append((int(round(curr_x)), int(round(curr_y))))
-                    
-                    if len(pts) > 1:
-                        # Draw polyline segments with speed-modulated width and alpha decay
-                        for k in range(len(pts) - 1):
-                            p1, p2 = pts[k], pts[k+1]
-                            if 0 <= p1[0] < w and 0 <= p1[1] < h and 0 <= p2[0] < w and 0 <= p2[1] < h:
-                                alpha = math.pow(1.0 - (k / float(len(pts))), 1.1)
-                                seg_color = (mapped_rgb * alpha).clip(0, 255).tolist()
-                                seg_w = max(1, int(ribbon_width * (1.0 + velocity_to_width * (mag_val / 20.0))))
-                                cv2.line(cur_ribbon_layer, p1, p2, seg_color, seg_w, cv2.LINE_AA)
+            sample_count = min(base_seed_count, len(valid_indices))
+            chosen_flat = np.random.choice(valid_indices, sample_count, p=probs, replace=False)
+            seed_ys, seed_xs = np.unravel_index(chosen_flat, (h, w))
             
-            # Render particle streamers / embers
-            if graphics_mode in ["lagrangian_particle_streamers", "hybrid_ribbons_and_particles"]:
-                p_count = min(len(seed_xs), int(base_seed_count * 0.8))
-                for s_idx in range(p_count):
-                    sx, sy = int(seed_ys[s_idx]), int(seed_xs[s_idx])
-                    base_rgb = cur_thfm[sx, sy]
-                    mag_val = cur_mag[sx, sy]
+            # 2. Render kinetic ribbons / streamlines
+            for s_idx in range(len(seed_xs)):
+                sx = float(max(0, min(w - 1, seed_xs[s_idx])))
+                sy = float(max(0, min(h - 1, seed_ys[s_idx])))
+                
+                base_rgb = cur_thfm[int(sy), int(sx)]
+                mag_val = cur_mag[int(sy), int(sx)]
+                
+                mapped_rgb = np.array(self._map_color(base_rgb, color_source, mag_val), dtype=np.float32) * thfm_color_intensity
+                
+                curr_x, curr_y = sx, sy
+                pts = [(int(round(curr_x)), int(round(curr_y)))]
+                
+                steps = streamline_length if graphics_mode != "dense_vortex_filaments" else int(streamline_length * 1.5)
+                for step in range(steps):
+                    ix = max(0, min(w - 1, int(round(curr_x))))
+                    iy = max(0, min(h - 1, int(round(curr_y))))
                     
-                    mapped_rgb = np.array(self._map_color(base_rgb, color_source, mag_val), dtype=np.float32) * thfm_color_intensity
+                    fu, fv = u[iy, ix], v[iy, ix]
+                    turb_x = math.sin(curr_y * 0.05 + t * 0.1) * flow_turbulence * 2.0
+                    turb_y = math.cos(curr_x * 0.05 + t * 0.1) * flow_turbulence * 2.0
                     
-                    p_rad = max(1, int(1 + (mag_val / 8.0)))
-                    cv2.circle(cur_particle_layer, (sy, sx), p_rad, (mapped_rgb * 1.2).clip(0, 255).tolist(), -1, cv2.LINE_AA)
-                    
-                    # Kinetic trail spark
-                    fu, fv = u[sx, sy], v[sx, sy]
-                    tail_x = int(round(sy - fu * 2.0))
-                    tail_y = int(round(sx - fv * 2.0))
-                    if 0 <= tail_x < w and 0 <= tail_y < h:
-                        cv2.line(cur_particle_layer, (sy, sx), (tail_x, tail_y), (mapped_rgb * 0.7).clip(0, 255).tolist(), 1, cv2.LINE_AA)
+                    curr_x = max(0.0, min(float(w - 1), curr_x + fu * advection_speed + turb_x))
+                    curr_y = max(0.0, min(float(h - 1), curr_y + fv * advection_speed + turb_y))
+                    pts.append((int(round(curr_x)), int(round(curr_y))))
+                
+                if len(pts) > 1:
+                    for k in range(len(pts) - 1):
+                        p1, p2 = pts[k], pts[k+1]
+                        if 0 <= p1[0] < w and 0 <= p1[1] < h and 0 <= p2[0] < w and 0 <= p2[1] < h:
+                            alpha = math.pow(1.0 - (k / float(len(pts))), 1.1)
+                            seg_color = (mapped_rgb * alpha).clip(0, 255).tolist()
+                            seg_w = max(1, int(ribbon_width * (1.0 + velocity_to_width * (mag_val / 20.0))))
+                            cv2.line(cur_ribbon_layer, p1, p2, seg_color, seg_w, cv2.LINE_AA)
             
-            # Optical bloom & composite
+            # 3. Lagrangian Kinetic Particle Engine (Spawn, Advect & Trace)
+            needed_particles = target_particle_count - len(active_particles)
+            if needed_particles > 0 and len(valid_indices) > 0:
+                p_sample_count = min(needed_particles, len(valid_indices))
+                spawn_flat = np.random.choice(valid_indices, p_sample_count, p=probs, replace=False)
+                spawn_ys, spawn_xs = np.unravel_index(spawn_flat, (h, w))
+                for px, py in zip(spawn_xs, spawn_ys):
+                    active_particles.append({
+                        "x": float(max(0, min(w - 1, px))),
+                        "y": float(max(0, min(h - 1, py))),
+                        "age": 0,
+                        "max_life": random.randint(12, 32),
+                        "trail": [(float(px), float(py))]
+                    })
+            
+            surviving_particles = []
+            for p in active_particles:
+                p["age"] += 1
+                if p["age"] >= p["max_life"]:
+                    continue
+                
+                cur_px = max(0, min(w - 1, int(round(p["x"]))))
+                cur_py = max(0, min(h - 1, int(round(p["y"]))))
+                
+                fu, fv = u[cur_py, cur_px], v[cur_py, cur_px]
+                fmag = cur_mag[cur_py, cur_px]
+                
+                turb_x = math.sin(p["y"] * 0.06 + t * 0.15) * flow_turbulence * 1.5
+                turb_y = math.cos(p["x"] * 0.06 + t * 0.15) * flow_turbulence * 1.5
+                
+                new_x = max(0.0, min(float(w - 1), p["x"] + fu * advection_speed + turb_x))
+                new_y = max(0.0, min(float(h - 1), p["y"] + fv * advection_speed + turb_y))
+                p["x"] = new_x
+                p["y"] = new_y
+                p["trail"].append((new_x, new_y))
+                if len(p["trail"]) > 10:
+                    p["trail"].pop(0)
+                
+                # Sample local color
+                sample_x = max(0, min(w - 1, int(round(new_x))))
+                sample_y = max(0, min(h - 1, int(round(new_y))))
+                base_rgb = cur_thfm[sample_y, sample_x]
+                if np.max(base_rgb) < 15 and body_mask[sample_y, sample_x] == 0:
+                    # Use vibrant color if in void space
+                    base_rgb = [180, 220, 255]
+                
+                mapped_rgb = np.array(self._map_color(base_rgb, color_source, fmag), dtype=np.float32) * (thfm_color_intensity * 1.2)
+                
+                life_alpha = math.sin(math.pi * p["age"] / float(p["max_life"])) ** 0.65
+                life_alpha = max(0.45, min(1.0, life_alpha))
+                
+                # Draw kinetic streamer tail
+                for k in range(len(p["trail"]) - 1):
+                    p1 = (int(round(p["trail"][k][0])), int(round(p["trail"][k][1])))
+                    p2 = (int(round(p["trail"][k+1][0])), int(round(p["trail"][k+1][1])))
+                    if 0 <= p1[0] < w and 0 <= p1[1] < h and 0 <= p2[0] < w and 0 <= p2[1] < h:
+                        t_alpha = life_alpha * ((k + 1) / float(len(p["trail"]))) * 0.8
+                        cv2.line(cur_particle_layer, p1, p2, (mapped_rgb * t_alpha).clip(0, 255).tolist(), 2, cv2.LINE_AA)
+                
+                # Draw luminous particle core & halo
+                p_head = (int(round(new_x)), int(round(new_y)))
+                if 0 <= p_head[0] < w and 0 <= p_head[1] < h:
+                    rad_core = max(2, int(2 + 2 * norm_mag[sample_y, sample_x]))
+                    rad_halo = rad_core + 2
+                    # Soft halo
+                    cv2.circle(cur_particle_layer, p_head, rad_halo, (mapped_rgb * life_alpha * 0.35).clip(0, 255).tolist(), -1, cv2.LINE_AA)
+                    # Solid core
+                    cv2.circle(cur_particle_layer, p_head, rad_core, (mapped_rgb * life_alpha * 1.1).clip(0, 255).tolist(), -1, cv2.LINE_AA)
+                
+                surviving_particles.append(p)
+            
+            active_particles = surviving_particles
+            
+            # Optical bloom & accumulation
             cur_composite = cur_ribbon_layer + cur_particle_layer
             if glow_strength > 0:
                 bloom = cv2.GaussianBlur(cur_composite, (0, 0), sigmaX=7.0, sigmaY=7.0) * glow_strength
                 cur_composite += bloom
+                
+                bloom_ribbons = cv2.GaussianBlur(cur_ribbon_layer, (0, 0), sigmaX=6.0, sigmaY=6.0) * (glow_strength * 0.8)
+                cur_ribbon_layer += bloom_ribbons
+                
+                bloom_particles = cv2.GaussianBlur(cur_particle_layer, (0, 0), sigmaX=6.0, sigmaY=6.0) * (glow_strength * 0.8)
+                cur_particle_layer += bloom_particles
             
             acc_canvas += cur_composite * (1.0 - temporal_decay * 0.3)
+            acc_ribbons += cur_ribbon_layer * (1.0 - temporal_decay * 0.3)
+            acc_particles += cur_particle_layer * (1.0 - temporal_decay * 0.3)
             
             frame_final = np.clip(acc_canvas, 0, 255).astype(np.uint8)
+            frame_ribbons = np.clip(acc_ribbons, 0, 255).astype(np.uint8)
+            frame_particles = np.clip(acc_particles, 0, 255).astype(np.uint8)
+            
             out_motion_field_frames.append(frame_final)
-            ribbons_layer_frames.append(np.clip(cur_ribbon_layer, 0, 255).astype(np.uint8))
-            particles_layer_frames.append(np.clip(cur_particle_layer, 0, 255).astype(np.uint8))
+            ribbons_layer_frames.append(frame_ribbons)
+            particles_layer_frames.append(frame_particles)
         
         output_dir = folder_paths.get_output_directory() if hasattr(folder_paths, "get_output_directory") else tempfile.gettempdir()
         tmp_mp4 = os.path.join(output_dir, f"THFM_Procedural_Motion_{int(time.time())}.mp4")
@@ -5698,7 +5788,7 @@ class THFMProceduralMotionRenderer:
         rib_tensor = torch.from_numpy(np.stack(ribbons_layer_frames, axis=0).astype(np.float32) / 255.0)
         part_tensor = torch.from_numpy(np.stack(particles_layer_frames, axis=0).astype(np.float32) / 255.0)
         
-        print(f"[THFMProceduralMotionRenderer] Rendered {num_frames} frames of abstract flowing motion field.")
+        print(f"[THFMProceduralMotionRenderer] Rendered {num_frames} frames (Particles: {len(active_particles)} active).")
         return (out_tensor, rib_tensor, part_tensor, tmp_mp4)
 
 
