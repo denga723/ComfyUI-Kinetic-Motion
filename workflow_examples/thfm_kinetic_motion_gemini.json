@@ -1024,9 +1024,9 @@
         "Node name for S&R": "PrimitiveStringMultiline"
       },
       "widgets_values": [
-        "Video style transfer: Transform the luminous Lagrangian kinetic particles and flowing ember streamers of Video1 into the rich textural material and expressive visual style depicted in Image1, Image2, Image3, and Image4. Flawlessly track and preserve the exact particle flow trajectories, velocity streamers, and dynamic emission fading against a deep, pure black background."
+        "Flawlessly track and enhance the exact moving trajectories, velocity vectors, and Lagrangian kinetic particle dynamics of Video1 with ultra-smooth temporal coherence and cinematic fluidity. Ensure every particle streamer, glowing filament, and ember path strictly follows the spatial geometry, velocity, and real-time motion timing of Video1 frame-by-frame with zero jitter, zero flicker, and buttery-smooth continuous flow. Subtly integrate soft ambient illumination and gentle color tones from Image1, Image2, Image3, and Image4 as minor accents, while ensuring the motion structure, physical dynamics, and trajectories remain 100% strictly aligned with Video1 on a clean, deep black background."
       ],
-      "title": "Gemini Stylization Text Prompt"
+      "title": "Gemini Smooth Motion Alignment Prompt"
     },
     {
       "id": 6,
@@ -1095,7 +1095,7 @@
         "",
         ""
       ],
-      "title": "Gemini Job Batcher (Lagrangian Video + 4 Style Images + Prompt)"
+      "title": "Gemini Job Batcher (Lagrangian Video + 4 Subtle Color Images + Motion Prompt)"
     },
     {
       "id": 7,
@@ -1238,9 +1238,9 @@
       },
       "widgets_values": [
         "",
-        "{\"model_name\": \"gemini-omni-flash-preview\", \"task\": \"video_editing\", \"duration\": 8, \"aspect_ratio\": \"1:1\", \"delivery\": \"base64\", \"prefix_text\": \"\", \"suffix_text\": \"\", \"image_roles\": {\"Image1\": \"reference\", \"Image2\": \"reference\", \"Image3\": \"reference\", \"Image4\": \"reference\"}}"
+        "{\"model_name\": \"gemini-omni-flash-preview\", \"task\": \"video_editing\", \"duration\": 8, \"aspect_ratio\": \"16:9\", \"delivery\": \"base64\", \"prefix_text\": \"\", \"suffix_text\": \"\", \"image_roles\": {\"Image1\": \"ambient_color\", \"Image2\": \"ambient_color\", \"Image3\": \"ambient_color\", \"Image4\": \"ambient_color\"}}"
       ],
-      "title": "Gemini Omni Model (Lagrangian Kinetic Video Stylization)"
+      "title": "Gemini Omni Model (Smooth Motion & Trajectory Synthesis)"
     },
     {
       "id": 10,
@@ -1352,7 +1352,7 @@
         true,
         "THFM_Gemini_Omni_Final_Artwork"
       ],
-      "title": "Final Stylized Gemini Omni Video Output"
+      "title": "Final Smooth Motion Video Output"
     },
     {
       "id": 80,
@@ -1823,7 +1823,7 @@
       "font_size": 24
     },
     {
-      "title": "3. 4 Style Reference Image Spots & 1 Text Prompt Spot",
+      "title": "3. 4 Subtle Image Spots & Smooth Motion Prompt Spot",
       "bounding": [
         60,
         960,
