@@ -1,0 +1,1870 @@
+{
+  "last_node_id": 200,
+  "last_link_id": 24,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [
+        80,
+        140
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": [
+            1,
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "all_template_xyz_body_parts.mp4",
+        "video"
+      ],
+      "title": "1. Input THFM XYZ Body Video"
+    },
+    {
+      "id": 50,
+      "type": "THFMKineticFlowExtractor",
+      "pos": [
+        460,
+        140
+      ],
+      "size": [
+        420,
+        480
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "thfm_video",
+          "name": "thfm_video",
+          "type": "*",
+          "link": 1
+        },
+        {
+          "localized_name": "flow_algorithm",
+          "name": "flow_algorithm",
+          "type": "COMBO",
+          "widget": {
+            "name": "flow_algorithm"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "spatial_smooth_sigma",
+          "name": "spatial_smooth_sigma",
+          "type": "FLOAT",
+          "widget": {
+            "name": "spatial_smooth_sigma"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_smoothing",
+          "name": "temporal_smoothing",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_smoothing"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "feature_gradient_boost",
+          "name": "feature_gradient_boost",
+          "type": "FLOAT",
+          "widget": {
+            "name": "feature_gradient_boost"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "magnitude_clamp",
+          "name": "magnitude_clamp",
+          "type": "FLOAT",
+          "widget": {
+            "name": "magnitude_clamp"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_resolution",
+          "name": "max_resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "thfm_flow_data",
+          "name": "thfm_flow_data",
+          "type": "THFM_FLOW_DATA",
+          "links": [
+            4
+          ]
+        },
+        {
+          "localized_name": "flow_vector_visualization",
+          "name": "flow_vector_visualization",
+          "type": "IMAGE",
+          "links": [
+            2,
+            22
+          ]
+        },
+        {
+          "localized_name": "thfm_surface_energy",
+          "name": "thfm_surface_energy",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "THFMKineticFlowExtractor"
+      },
+      "widgets_values": [
+        "farneback_dense",
+        2.5,
+        0.65,
+        1.4,
+        35.0,
+        "720p (Fastest)",
+        24
+      ],
+      "title": "2. THFM Kinetic Flow Extractor (Dense Flow on XYZ)"
+    },
+    {
+      "id": 51,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        940,
+        60
+      ],
+      "size": [
+        360,
+        260
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "THFM_Flow_Vector_Field"
+      ],
+      "title": "Stage 2: Dense Optical Flow Field (HSV Vectors)"
+    },
+    {
+      "id": 52,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        940,
+        360
+      ],
+      "size": [
+        360,
+        260
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "THFM_Surface_Energy_Map"
+      ],
+      "title": "Stage 3: THFM Surface Kinetic Energy"
+    },
+    {
+      "id": 60,
+      "type": "THFMProceduralMotionRenderer",
+      "pos": [
+        1340,
+        140
+      ],
+      "size": [
+        440,
+        620
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "thfm_flow_data",
+          "name": "thfm_flow_data",
+          "type": "THFM_FLOW_DATA",
+          "link": 4
+        },
+        {
+          "localized_name": "graphics_mode",
+          "name": "graphics_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "graphics_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "particle_density",
+          "name": "particle_density",
+          "type": "FLOAT",
+          "widget": {
+            "name": "particle_density"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "streamline_length",
+          "name": "streamline_length",
+          "type": "INT",
+          "widget": {
+            "name": "streamline_length"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "advection_speed",
+          "name": "advection_speed",
+          "type": "FLOAT",
+          "widget": {
+            "name": "advection_speed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "ribbon_width",
+          "name": "ribbon_width",
+          "type": "INT",
+          "widget": {
+            "name": "ribbon_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "velocity_to_width",
+          "name": "velocity_to_width",
+          "type": "FLOAT",
+          "widget": {
+            "name": "velocity_to_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "color_source",
+          "name": "color_source",
+          "type": "COMBO",
+          "widget": {
+            "name": "color_source"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "thfm_color_intensity",
+          "name": "thfm_color_intensity",
+          "type": "FLOAT",
+          "widget": {
+            "name": "thfm_color_intensity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_decay",
+          "name": "temporal_decay",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temporal_decay"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "glow_strength",
+          "name": "glow_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "glow_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "flow_turbulence",
+          "name": "flow_turbulence",
+          "type": "FLOAT",
+          "widget": {
+            "name": "flow_turbulence"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "INT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "abstract_motion_field_video",
+          "name": "abstract_motion_field_video",
+          "type": "IMAGE",
+          "links": [
+            5
+          ]
+        },
+        {
+          "localized_name": "ribbons_layer",
+          "name": "ribbons_layer",
+          "type": "IMAGE",
+          "links": [
+            6
+          ]
+        },
+        {
+          "localized_name": "particles_layer",
+          "name": "particles_layer",
+          "type": "IMAGE",
+          "links": [
+            7,
+            12,
+            19,
+            23
+          ]
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "THFMProceduralMotionRenderer"
+      },
+      "widgets_values": [
+        "hybrid_ribbons_and_particles",
+        0.85,
+        28,
+        1.8,
+        4,
+        1.5,
+        "native_thfm_xyz",
+        1.6,
+        0.88,
+        0.75,
+        0.15,
+        24
+      ],
+      "title": "3. THFM Procedural Motion Field Renderer (Flow + XYZ Ribbons & Lagrangian Particles)"
+    },
+    {
+      "id": 61,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1820,
+        60
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 61,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 5
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "THFM_Abstract_Motion_Field"
+      ],
+      "title": "Stage 4: Master Abstract Flowing Motion Field"
+    },
+    {
+      "id": 62,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1820,
+        340
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 62,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "THFM_Ribbons_Layer"
+      ],
+      "title": "Layer: Kinetic Flow Ribbons"
+    },
+    {
+      "id": 63,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        1820,
+        620
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 63,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "THFM_Lagrangian_Particles_Layer"
+      ],
+      "title": "Layer: Lagrangian Kinetic Particles (Video Input for Gemini)"
+    },
+    {
+      "id": 17,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        1020
+      ],
+      "size": [
+        220,
+        240
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "E1.png",
+        "image"
+      ],
+      "title": "Style Reference Image 1"
+    },
+    {
+      "id": 18,
+      "type": "LoadImage",
+      "pos": [
+        320,
+        1020
+      ],
+      "size": [
+        220,
+        240
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "E2.png",
+        "image"
+      ],
+      "title": "Style Reference Image 2"
+    },
+    {
+      "id": 19,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        1300
+      ],
+      "size": [
+        220,
+        240
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            10
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "E3.png",
+        "image"
+      ],
+      "title": "Style Reference Image 3"
+    },
+    {
+      "id": 20,
+      "type": "LoadImage",
+      "pos": [
+        320,
+        1300
+      ],
+      "size": [
+        220,
+        240
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "E4.png",
+        "image"
+      ],
+      "title": "Style Reference Image 4"
+    },
+    {
+      "id": 4,
+      "type": "ImageBatchMulti",
+      "pos": [
+        580,
+        1020
+      ],
+      "size": [
+        260,
+        240
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image_1",
+          "name": "image_1",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "localized_name": "image_2",
+          "name": "image_2",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "localized_name": "inputcount",
+          "name": "inputcount",
+          "type": "INT",
+          "widget": {
+            "name": "inputcount"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image_3",
+          "name": "image_3",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "localized_name": "image_4",
+          "name": "image_4",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBatchMulti"
+      },
+      "widgets_values": [
+        4
+      ],
+      "title": "4 Style References (Image1..Image4)"
+    },
+    {
+      "id": 5,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        580,
+        1300
+      ],
+      "size": [
+        260,
+        240
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "Video style transfer: Transform the luminous Lagrangian kinetic particles and flowing ember streamers of Video1 into the rich textural material and expressive visual style depicted in Image1, Image2, Image3, and Image4. Flawlessly track and preserve the exact particle flow trajectories, velocity streamers, and dynamic emission fading against a deep, pure black background."
+      ],
+      "title": "Gemini Stylization Text Prompt"
+    },
+    {
+      "id": 6,
+      "type": "GeminiJobBatcher",
+      "pos": [
+        880,
+        1140
+      ],
+      "size": [
+        420,
+        520
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "jobs",
+          "name": "jobs",
+          "type": "INT",
+          "widget": {
+            "name": "jobs"
+          },
+          "link": null
+        },
+        {
+          "color_off": "#8e24aa",
+          "color_on": "#8e24aa",
+          "label": "Video1",
+          "name": "image_stream_1",
+          "type": "*",
+          "link": 12
+        },
+        {
+          "color_off": "#2e64de",
+          "color_on": "#2e64de",
+          "label": "Image1",
+          "name": "image_stream_2",
+          "type": "*",
+          "link": 13
+        },
+        {
+          "color_off": "#826A8C",
+          "label": "Text1",
+          "name": "text_stream_3",
+          "type": "*",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "stream",
+          "name": "stream",
+          "type": "*",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiJobBatcher"
+      },
+      "widgets_values": [
+        1,
+        "[{\"id\": 1, \"type\": \"IMAGE\", \"prefix\": \"\", \"delim\": \"\\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 1, \"cycle\": \"iterate\", \"index\": 0, \"muted\": false, \"mode\": \"video\", \"fps\": 24, \"_auto_mode_set\": true, \"_displayLabel\": \"Video1\"}, {\"id\": 2, \"type\": \"IMAGE\", \"prefix\": \"\", \"delim\": \"\\n\", \"suffix\": \"\", \"aspect\": \"guess\", \"imgs_per_job\": 4, \"cycle\": \"iterate\", \"index\": 0, \"muted\": false, \"mode\": \"images\", \"fps\": 24, \"_auto_mode_set\": true, \"_displayLabel\": \"Image1\"}, {\"id\": 3, \"type\": \"STRING\", \"delim\": \"\\n\", \"prefix\": \"\", \"suffix\": \"\", \"muted\": false, \"_displayLabel\": \"Text1\"}]",
+        "",
+        ""
+      ],
+      "title": "Gemini Job Batcher (Lagrangian Video + 4 Style Images + Prompt)"
+    },
+    {
+      "id": 7,
+      "type": "GeminiAuthConfig",
+      "pos": [
+        1340,
+        1140
+      ],
+      "size": [
+        360,
+        160
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "project_id",
+          "name": "project_id",
+          "type": "STRING",
+          "widget": {
+            "name": "project_id"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "location",
+          "name": "location",
+          "type": "COMBO",
+          "widget": {
+            "name": "location"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "service_account_json_path",
+          "name": "service_account_json_path",
+          "type": "STRING",
+          "widget": {
+            "name": "service_account_json_path"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "api_key",
+          "name": "api_key",
+          "type": "STRING",
+          "widget": {
+            "name": "api_key"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "auth_config",
+          "name": "auth_config",
+          "type": "GEMINI_AUTH",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiAuthConfig"
+      },
+      "widgets_values": [
+        "creativelab-prototypes",
+        "global",
+        "",
+        ""
+      ],
+      "title": "Gemini Auth Config (Vertex AI)"
+    },
+    {
+      "id": 8,
+      "type": "GeminiOmniModel",
+      "pos": [
+        1340,
+        1340
+      ],
+      "size": [
+        520,
+        520
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "stream",
+          "name": "stream",
+          "type": "*",
+          "link": 15
+        },
+        {
+          "localized_name": "gcs_bucket",
+          "name": "gcs_bucket",
+          "type": "STRING",
+          "widget": {
+            "name": "gcs_bucket"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "auth_config",
+          "name": "auth_config",
+          "type": "GEMINI_AUTH",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "text",
+          "name": "text",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            18,
+            20,
+            24
+          ]
+        },
+        {
+          "localized_name": "response",
+          "name": "response",
+          "type": "GEMINI_RESPONSE",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiOmniModel"
+      },
+      "widgets_values": [
+        "",
+        "{\"model_name\": \"gemini-omni-flash-preview\", \"task\": \"video_editing\", \"duration\": 8, \"aspect_ratio\": \"1:1\", \"delivery\": \"base64\", \"prefix_text\": \"\", \"suffix_text\": \"\", \"image_roles\": {\"Image1\": \"reference\", \"Image2\": \"reference\", \"Image3\": \"reference\", \"Image4\": \"reference\"}}"
+      ],
+      "title": "Gemini Omni Model (Lagrangian Kinetic Video Stylization)"
+    },
+    {
+      "id": 10,
+      "type": "GeminiMultimodalPreview",
+      "pos": [
+        1900,
+        1340
+      ],
+      "size": [
+        320,
+        340
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "response",
+          "name": "response",
+          "type": "*",
+          "link": 17
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "GeminiMultimodalPreview"
+      },
+      "widgets_values": [],
+      "title": "Gemini Metadata & Response Preview"
+    },
+    {
+      "id": 31,
+      "type": "GeminiVideoCombine",
+      "pos": [
+        2260,
+        1340
+      ],
+      "size": [
+        360,
+        340
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 18
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiVideoCombine"
+      },
+      "widgets_values": [
+        24,
+        "mp4",
+        true,
+        "THFM_Gemini_Omni_Final_Artwork"
+      ],
+      "title": "Final Stylized Gemini Omni Video Output"
+    },
+    {
+      "id": 80,
+      "type": "KineticDualComparisonViewer",
+      "pos": [
+        2660,
+        1340
+      ],
+      "size": [
+        520,
+        420
+      ],
+      "flags": {},
+      "order": 80,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "stage6_fused_brushstrokes",
+          "name": "stage6_fused_brushstrokes",
+          "type": "*",
+          "link": 19
+        },
+        {
+          "localized_name": "final_stylized_artwork",
+          "name": "final_stylized_artwork",
+          "type": "*",
+          "link": 20
+        },
+        {
+          "localized_name": "layout",
+          "name": "layout",
+          "type": "COMBO",
+          "widget": {
+            "name": "layout"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "show_labels",
+          "name": "show_labels",
+          "type": "COMBO",
+          "widget": {
+            "name": "show_labels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "label_left",
+          "name": "label_left",
+          "type": "STRING",
+          "widget": {
+            "name": "label_left"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "label_right",
+          "name": "label_right",
+          "type": "STRING",
+          "widget": {
+            "name": "label_right"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "comparison_video",
+          "name": "comparison_video",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KineticDualComparisonViewer"
+      },
+      "widgets_values": [
+        "side_by_side_horizontal",
+        "enable",
+        "Lagrangian Kinetic Particles",
+        "Gemini Omni Masterpiece",
+        24,
+        "mp4",
+        true,
+        "THFM_Dual_Particles_vs_Gemini"
+      ],
+      "title": "Dual Output Comparison Viewer (Lagrangian Input vs Gemini Omni Final)"
+    },
+    {
+      "id": 200,
+      "type": "THFMStagePipelineViewer",
+      "pos": [
+        3220,
+        1340
+      ],
+      "size": [
+        520,
+        560
+      ],
+      "flags": {},
+      "order": 200,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "thfm_raw_input",
+          "name": "thfm_raw_input",
+          "type": "*",
+          "link": 21
+        },
+        {
+          "localized_name": "thfm_optical_flow",
+          "name": "thfm_optical_flow",
+          "type": "*",
+          "link": 22
+        },
+        {
+          "localized_name": "thfm_surface_energy",
+          "name": "thfm_surface_energy",
+          "type": "*",
+          "link": 23
+        },
+        {
+          "localized_name": "procedural_motion_field",
+          "name": "procedural_motion_field",
+          "type": "*",
+          "link": 24
+        },
+        {
+          "localized_name": "layout",
+          "name": "layout",
+          "type": "COMBO",
+          "widget": {
+            "name": "layout"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "show_hud_labels",
+          "name": "show_hud_labels",
+          "type": "COMBO",
+          "widget": {
+            "name": "show_hud_labels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frame_rate",
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMBO",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_output",
+          "name": "save_output",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_output"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "pipeline_preview",
+          "name": "pipeline_preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "localized_name": "video_path",
+          "name": "video_path",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "THFMStagePipelineViewer"
+      },
+      "widgets_values": [
+        "grid_2x2",
+        "enable",
+        24,
+        "mp4",
+        true,
+        "THFM_Gemini_Omni_4Stage_HUD"
+      ],
+      "title": "Multi-Stage Full Pipeline Synchronizer (4-Stage HUD Grid: Input + Flow + Particles + Gemini Final)"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      50,
+      0,
+      "*"
+    ],
+    [
+      2,
+      50,
+      1,
+      51,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      50,
+      2,
+      52,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      50,
+      0,
+      60,
+      0,
+      "THFM_FLOW_DATA"
+    ],
+    [
+      5,
+      60,
+      0,
+      61,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      60,
+      1,
+      62,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      60,
+      2,
+      63,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      17,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      18,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      10,
+      19,
+      0,
+      4,
+      3,
+      "IMAGE"
+    ],
+    [
+      11,
+      20,
+      0,
+      4,
+      4,
+      "IMAGE"
+    ],
+    [
+      12,
+      60,
+      2,
+      6,
+      1,
+      "*"
+    ],
+    [
+      13,
+      4,
+      0,
+      6,
+      2,
+      "*"
+    ],
+    [
+      14,
+      5,
+      0,
+      6,
+      3,
+      "*"
+    ],
+    [
+      15,
+      6,
+      0,
+      8,
+      0,
+      "*"
+    ],
+    [
+      16,
+      7,
+      0,
+      8,
+      2,
+      "GEMINI_AUTH"
+    ],
+    [
+      17,
+      8,
+      2,
+      10,
+      0,
+      "*"
+    ],
+    [
+      18,
+      8,
+      1,
+      31,
+      0,
+      "IMAGE"
+    ],
+    [
+      19,
+      60,
+      2,
+      80,
+      0,
+      "*"
+    ],
+    [
+      20,
+      8,
+      1,
+      80,
+      1,
+      "*"
+    ],
+    [
+      21,
+      1,
+      0,
+      200,
+      0,
+      "*"
+    ],
+    [
+      22,
+      50,
+      1,
+      200,
+      1,
+      "*"
+    ],
+    [
+      23,
+      60,
+      2,
+      200,
+      2,
+      "*"
+    ],
+    [
+      24,
+      8,
+      1,
+      200,
+      3,
+      "*"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "1. THFM Input & Dense Optical Flow Extraction (Frame-by-Frame)",
+      "bounding": [
+        60,
+        0,
+        1260,
+        680
+      ],
+      "color": "#1e2b37",
+      "font_size": 24
+    },
+    {
+      "title": "2. Procedural Kinetic Motion Field Generator (Ribbons + Lagrangian Particles)",
+      "bounding": [
+        1320,
+        0,
+        900,
+        920
+      ],
+      "color": "#331e36",
+      "font_size": 24
+    },
+    {
+      "title": "3. 4 Style Reference Image Spots & 1 Text Prompt Spot",
+      "bounding": [
+        60,
+        960,
+        800,
+        620
+      ],
+      "color": "#3a3020",
+      "font_size": 24
+    },
+    {
+      "title": "4. Gemini Job Batcher & Vertex AI Omni Video Stylization Engine",
+      "bounding": [
+        860,
+        1080,
+        1780,
+        840
+      ],
+      "color": "#2a1b38",
+      "font_size": 24
+    },
+    {
+      "title": "5. Dual Comparison Viewer & Multi-Stage Synchronizer HUD Grid",
+      "bounding": [
+        2640,
+        1260,
+        1140,
+        680
+      ],
+      "color": "#162b32",
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.5,
+      "offset": [
+        -20,
+        -20
+      ]
+    }
+  },
+  "version": 0.4
+}
