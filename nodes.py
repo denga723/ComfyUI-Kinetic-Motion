@@ -5338,6 +5338,512 @@ class DualPathPipelineViewer:
         }
 
 
+# ==============================================================================
+# THFM (Temporal Human Feature Map / XYZ Coordinate) KINETIC FLOW PIPELINE
+# ==============================================================================
+
+class THFMKineticFlowExtractor:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "thfm_video": (ANY_TYPE, {"tooltip": "THFM XYZ Body video frames (tensor or video path)"}),
+            },
+            "optional": {
+                "flow_algorithm": (["farneback_dense", "lucas_kanade_dense"], {"default": "farneback_dense"}),
+                "spatial_smooth_sigma": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 10.0, "step": 0.5, "tooltip": "Gaussian spatial smoothing radius on (u, v) vector field"}),
+                "temporal_smoothing": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 0.99, "step": 0.05, "tooltip": "Exponential Moving Average (EMA) temporal smoothing factor across frames"}),
+                "feature_gradient_boost": ("FLOAT", {"default": 1.4, "min": 0.1, "max": 3.0, "step": 0.1, "tooltip": "Enhances flow sensitivity to THFM XYZ coordinate gradients"}),
+                "magnitude_clamp": ("FLOAT", {"default": 35.0, "min": 5.0, "max": 100.0, "step": 1.0, "tooltip": "Maximum pixel displacement cap per frame"}),
+                "max_resolution": (["720p (Fastest)", "1080p (Standard)", "540p (Draft)", "Original (No Limit)"], {"default": "720p (Fastest)"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+            }
+        }
+
+    RETURN_TYPES = ("THFM_FLOW_DATA", "IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("thfm_flow_data", "flow_vector_visualization", "thfm_surface_energy", "video_path")
+    FUNCTION = "extract_thfm_flow"
+    CATEGORY = "kinetic_motion/thfm"
+
+    def extract_thfm_flow(self, thfm_video, flow_algorithm="farneback_dense", spatial_smooth_sigma=2.5, temporal_smoothing=0.65, feature_gradient_boost=1.4, magnitude_clamp=35.0, max_resolution="720p (Fastest)", fps=24):
+        frames_rgb = []
+        v_path = get_video_file_path(thfm_video)
+        if v_path and os.path.exists(v_path):
+            cap = cv2.VideoCapture(v_path)
+            while True:
+                ret, frame = cap.read()
+                if not ret: break
+                frames_rgb.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+        elif isinstance(thfm_video, torch.Tensor):
+            t = thfm_video.cpu().numpy()
+            if len(t.shape) == 4:
+                for idx in range(t.shape[0]):
+                    frames_rgb.append((np.clip(t[idx], 0.0, 1.0) * 255.0).astype(np.uint8))
+            elif len(t.shape) == 3:
+                frames_rgb.append((np.clip(t, 0.0, 1.0) * 255.0).astype(np.uint8))
+        elif isinstance(thfm_video, list):
+            for item in thfm_video:
+                if isinstance(item, torch.Tensor):
+                    t = item.cpu().numpy()
+                    if len(t.shape) == 4:
+                        for idx in range(t.shape[0]):
+                            frames_rgb.append((np.clip(t[idx], 0.0, 1.0) * 255.0).astype(np.uint8))
+                    elif len(t.shape) == 3:
+                        frames_rgb.append((np.clip(t, 0.0, 1.0) * 255.0).astype(np.uint8))
+        
+        if not frames_rgb:
+            frames_rgb = [np.zeros((720, 1280, 3), dtype=np.uint8)]
+        
+        orig_h, orig_w = frames_rgb[0].shape[:2]
+        target_w, target_h = orig_w, orig_h
+        if max_resolution == "720p (Fastest)" and (orig_w > 1280 or orig_h > 720):
+            scale = min(1280.0 / orig_w, 720.0 / orig_h)
+            target_w, target_h = int(orig_w * scale), int(orig_h * scale)
+        elif max_resolution == "540p (Draft)" and (orig_w > 960 or orig_h > 540):
+            scale = min(960.0 / orig_w, 540.0 / orig_h)
+            target_w, target_h = int(orig_w * scale), int(orig_h * scale)
+        elif max_resolution == "1080p (Standard)" and (orig_w > 1920 or orig_h > 1080):
+            scale = min(1920.0 / orig_w, 1080.0 / orig_h)
+            target_w, target_h = int(orig_w * scale), int(orig_h * scale)
+        
+        target_w = target_w if target_w % 2 == 0 else target_w - 1
+        target_h = target_h if target_h % 2 == 0 else target_h - 1
+        
+        if (target_w, target_h) != (orig_w, orig_h):
+            frames_rgb = [cv2.resize(f, (target_w, target_h), interpolation=cv2.INTER_AREA) for f in frames_rgb]
+        
+        num_frames = len(frames_rgb)
+        h, w = frames_rgb[0].shape[:2]
+        
+        flow_fields = []
+        magnitude_fields = []
+        flow_vis_frames = []
+        surface_energy_frames = []
+        
+        prev_smoothed_flow = np.zeros((h, w, 2), dtype=np.float32)
+        prev_gray = None
+        
+        for t_idx in range(num_frames):
+            cur_thfm = frames_rgb[t_idx]
+            cur_gray = cv2.cvtColor(cur_thfm, cv2.COLOR_RGB2GRAY)
+            if feature_gradient_boost != 1.0:
+                cur_gray = np.clip(cur_gray.astype(np.float32) * feature_gradient_boost, 0, 255).astype(np.uint8)
+            
+            if prev_gray is None or t_idx == 0:
+                cur_flow = np.zeros((h, w, 2), dtype=np.float32)
+            else:
+                if flow_algorithm == "lucas_kanade_dense":
+                    cur_flow = cv2.calcOpticalFlowFarneback(prev_gray, cur_gray, None, 0.5, 3, 13, 3, 5, 1.1, cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
+                else:
+                    cur_flow = cv2.calcOpticalFlowFarneback(prev_gray, cur_gray, None, 0.5, 4, 17, 3, 7, 1.3, 0)
+            
+            if spatial_smooth_sigma > 0:
+                u_smooth = cv2.GaussianBlur(cur_flow[..., 0], (0, 0), spatial_smooth_sigma)
+                v_smooth = cv2.GaussianBlur(cur_flow[..., 1], (0, 0), spatial_smooth_sigma)
+                cur_flow = np.stack([u_smooth, v_smooth], axis=-1)
+            
+            if t_idx > 0 and temporal_smoothing > 0:
+                cur_flow = temporal_smoothing * prev_smoothed_flow + (1.0 - temporal_smoothing) * cur_flow
+            
+            prev_smoothed_flow = cur_flow.copy()
+            prev_gray = cur_gray
+            
+            u, v = cur_flow[..., 0], cur_flow[..., 1]
+            mag, ang = cv2.cartToPolar(u, v, angleInDegrees=True)
+            mag = np.clip(mag, 0.0, magnitude_clamp)
+            
+            thfm_lum = np.max(cur_thfm, axis=-1).astype(np.float32) / 255.0
+            body_mask = (thfm_lum > 0.04).astype(np.float32)
+            body_mask_smooth = cv2.GaussianBlur(body_mask, (0, 0), 2.0)
+            
+            cur_flow[..., 0] *= body_mask_smooth
+            cur_flow[..., 1] *= body_mask_smooth
+            mag *= body_mask_smooth
+            
+            flow_fields.append(cur_flow)
+            magnitude_fields.append(mag)
+            
+            # Flow visualization
+            hsv = np.zeros((h, w, 3), dtype=np.uint8)
+            hsv[..., 0] = (ang / 2.0).astype(np.uint8)
+            hsv[..., 1] = 255
+            hsv[..., 2] = np.clip(mag / (magnitude_clamp * 0.5) * 255.0, 0, 255).astype(np.uint8)
+            flow_rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+            flow_vis_frames.append(flow_rgb)
+            
+            # Energy map
+            energy_factor = np.clip(1.0 + (mag / 10.0), 1.0, 3.5)[..., None]
+            energy_rgb = np.clip(cur_thfm.astype(np.float32) * energy_factor, 0, 255).astype(np.uint8)
+            surface_energy_frames.append(energy_rgb)
+        
+        thfm_flow_data = {
+            "flow_fields": flow_fields,
+            "magnitude_fields": magnitude_fields,
+            "thfm_frames": frames_rgb,
+            "width": w,
+            "height": h,
+            "fps": fps,
+            "num_frames": num_frames
+        }
+        
+        output_dir = folder_paths.get_output_directory() if hasattr(folder_paths, "get_output_directory") else tempfile.gettempdir()
+        tmp_mp4 = os.path.join(output_dir, f"THFM_Flow_Extracted_{int(time.time())}.mp4")
+        writer = cv2.VideoWriter(tmp_mp4, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+        for vis in flow_vis_frames:
+            writer.write(cv2.cvtColor(vis, cv2.COLOR_RGB2BGR))
+        writer.release()
+        
+        flow_tensor = torch.from_numpy(np.stack(flow_vis_frames, axis=0).astype(np.float32) / 255.0)
+        energy_tensor = torch.from_numpy(np.stack(surface_energy_frames, axis=0).astype(np.float32) / 255.0)
+        
+        print(f"[THFMKineticFlowExtractor] Extracted {num_frames} frames of dense flow from THFM XYZ at {w}x{h}.")
+        return (thfm_flow_data, flow_tensor, energy_tensor, tmp_mp4)
+
+
+class THFMProceduralMotionRenderer:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "thfm_flow_data": ("THFM_FLOW_DATA", {"tooltip": "THFM Flow Data dictionary from THFMKineticFlowExtractor"}),
+            },
+            "optional": {
+                "graphics_mode": ([
+                    "advected_kinetic_ribbons",
+                    "lagrangian_particle_streamers",
+                    "dense_vortex_filaments",
+                    "hybrid_ribbons_and_particles"
+                ], {"default": "advected_kinetic_ribbons"}),
+                "particle_density": ("FLOAT", {"default": 0.75, "min": 0.1, "max": 2.5, "step": 0.05, "tooltip": "Density multiplier for procedural ribbon and particle seeds"}),
+                "streamline_length": ("INT", {"default": 24, "min": 4, "max": 80, "step": 2, "tooltip": "Advection length in steps for continuous flow filaments"}),
+                "advection_speed": ("FLOAT", {"default": 1.8, "min": 0.1, "max": 5.0, "step": 0.1, "tooltip": "Velocity multiplier along vector field"}),
+                "ribbon_width": ("INT", {"default": 4, "min": 1, "max": 20, "step": 1, "tooltip": "Base raster width for kinetic ribbons"}),
+                "velocity_to_width": ("FLOAT", {"default": 1.5, "min": 0.0, "max": 4.0, "step": 0.1, "tooltip": "Speed-modulated line thickness expansion"}),
+                "color_source": ([
+                    "native_thfm_xyz",
+                    "thfm_vibrant_spectrum",
+                    "luminous_opal",
+                    "golden_amber",
+                    "cyan_amethyst",
+                    "pure_luminous_white"
+                ], {"default": "native_thfm_xyz"}),
+                "thfm_color_intensity": ("FLOAT", {"default": 1.6, "min": 0.2, "max": 3.0, "step": 0.1, "tooltip": "Color emission saturation & brightness multiplier"}),
+                "temporal_decay": ("FLOAT", {"default": 0.88, "min": 0.50, "max": 0.99, "step": 0.01, "tooltip": "Continuous temporal canvas persistence decay per frame"}),
+                "glow_strength": ("FLOAT", {"default": 0.75, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Optical luminescence bloom around high-velocity filaments"}),
+                "flow_turbulence": ("FLOAT", {"default": 0.15, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Adds organic vorticity micro-perturbations"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60})
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("abstract_motion_field_video", "ribbons_layer", "particles_layer", "video_path")
+    FUNCTION = "render_thfm_motion_field"
+    CATEGORY = "kinetic_motion/thfm"
+
+    def _map_color(self, base_rgb, color_source, mag):
+        r, g, b = float(base_rgb[0]), float(base_rgb[1]), float(base_rgb[2])
+        lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255.0
+        
+        if color_source == "native_thfm_xyz":
+            return (r, g, b)
+        elif color_source == "thfm_vibrant_spectrum":
+            # Boost saturation & hue contrast
+            max_c = max(r, g, b, 1.0)
+            boost_r = (r / max_c) * 255.0
+            boost_g = (g / max_c) * 255.0
+            boost_b = (b / max_c) * 255.0
+            return (boost_r, boost_g, boost_b)
+        elif color_source == "luminous_opal":
+            # Iridescent opal / pearl hues
+            return (255.0 * lum * 0.9 + 25.0, 240.0 * (1.0 - lum) + 15.0, 255.0 * lum + 40.0)
+        elif color_source == "golden_amber":
+            # Molten amber & copper
+            return (255.0 * lum + 50.0, 180.0 * lum + 20.0, 40.0 * lum)
+        elif color_source == "cyan_amethyst":
+            # Electric cyan & violet
+            return (180.0 * (1.0 - lum) + 75.0, 230.0 * lum + 25.0, 255.0)
+        elif color_source == "pure_luminous_white":
+            return (255.0, 255.0, 255.0)
+        return (r, g, b)
+
+    def render_thfm_motion_field(self, thfm_flow_data, graphics_mode="advected_kinetic_ribbons", particle_density=0.75, streamline_length=24, advection_speed=1.8, ribbon_width=4, velocity_to_width=1.5, color_source="native_thfm_xyz", thfm_color_intensity=1.6, temporal_decay=0.88, glow_strength=0.75, flow_turbulence=0.15, fps=24):
+        flow_fields = thfm_flow_data.get("flow_fields", [])
+        mag_fields = thfm_flow_data.get("magnitude_fields", [])
+        thfm_frames = thfm_flow_data.get("thfm_frames", [])
+        w = thfm_flow_data.get("width", 1280)
+        h = thfm_flow_data.get("height", 720)
+        num_frames = len(thfm_frames)
+        
+        if num_frames == 0:
+            blank = np.zeros((1, h, w, 3), dtype=np.float32)
+            return (torch.from_numpy(blank), torch.from_numpy(blank), torch.from_numpy(blank), "")
+        
+        acc_canvas = np.zeros((h, w, 3), dtype=np.float32)
+        out_motion_field_frames = []
+        ribbons_layer_frames = []
+        particles_layer_frames = []
+        
+        base_seed_count = int(1800 * particle_density)
+        
+        for t in range(num_frames):
+            acc_canvas *= temporal_decay
+            cur_flow = flow_fields[t]
+            cur_mag = mag_fields[t]
+            cur_thfm = thfm_frames[t]
+            
+            u, v = cur_flow[..., 0], cur_flow[..., 1]
+            
+            cur_ribbon_layer = np.zeros((h, w, 3), dtype=np.float32)
+            cur_particle_layer = np.zeros((h, w, 3), dtype=np.float32)
+            
+            # Identify active regions
+            thfm_lum = np.max(cur_thfm, axis=-1).astype(np.float32) / 255.0
+            activity_weights = (0.5 * thfm_lum + 0.5 * (cur_mag / 15.0)).flatten()
+            valid_indices = np.where(activity_weights > 0.05)[0]
+            
+            if len(valid_indices) > 0:
+                probs = activity_weights[valid_indices]
+                prob_sum = probs.sum()
+                if prob_sum > 0:
+                    probs = probs / prob_sum
+                    sample_count = min(base_seed_count, len(valid_indices))
+                    chosen_flat = np.random.choice(valid_indices, sample_count, p=probs, replace=False)
+                    seed_ys, seed_xs = np.unravel_index(chosen_flat, (h, w))
+                else:
+                    seed_ys, seed_xs = [], []
+            else:
+                seed_ys, seed_xs = [], []
+            
+            # Render ribbons / streamlines
+            if graphics_mode in ["advected_kinetic_ribbons", "dense_vortex_filaments", "hybrid_ribbons_and_particles"]:
+                for s_idx in range(len(seed_xs)):
+                    sx, sy = float(seed_xs[s_idx]), float(seed_ys[s_idx])
+                    base_rgb = cur_thfm[int(sy), int(sx)]
+                    mag_val = cur_mag[int(sy), int(sx)]
+                    
+                    mapped_rgb = np.array(self._map_color(base_rgb, color_source, mag_val), dtype=np.float32) * thfm_color_intensity
+                    
+                    curr_x, curr_y = sx, sy
+                    pts = [(int(round(curr_x)), int(round(curr_y)))]
+                    
+                    steps = streamline_length if graphics_mode != "dense_vortex_filaments" else int(streamline_length * 1.5)
+                    for step in range(steps):
+                        ix, iy = int(round(curr_x)), int(round(curr_y))
+                        if ix < 0 or ix >= w or iy < 0 or iy >= h:
+                            break
+                        fu, fv = u[iy, ix], v[iy, ix]
+                        fmag = cur_mag[iy, ix]
+                        if fmag < 0.1:
+                            break
+                        
+                        turb_x = math.sin(curr_y * 0.05 + t * 0.1) * flow_turbulence * 2.0
+                        turb_y = math.cos(curr_x * 0.05 + t * 0.1) * flow_turbulence * 2.0
+                        
+                        curr_x += (fu * advection_speed + turb_x)
+                        curr_y += (fv * advection_speed + turb_y)
+                        pts.append((int(round(curr_x)), int(round(curr_y))))
+                    
+                    if len(pts) > 1:
+                        # Draw polyline segments with speed-modulated width and alpha decay
+                        for k in range(len(pts) - 1):
+                            p1, p2 = pts[k], pts[k+1]
+                            if 0 <= p1[0] < w and 0 <= p1[1] < h and 0 <= p2[0] < w and 0 <= p2[1] < h:
+                                alpha = math.pow(1.0 - (k / float(len(pts))), 1.1)
+                                seg_color = (mapped_rgb * alpha).clip(0, 255).tolist()
+                                seg_w = max(1, int(ribbon_width * (1.0 + velocity_to_width * (mag_val / 20.0))))
+                                cv2.line(cur_ribbon_layer, p1, p2, seg_color, seg_w, cv2.LINE_AA)
+            
+            # Render particle streamers / embers
+            if graphics_mode in ["lagrangian_particle_streamers", "hybrid_ribbons_and_particles"]:
+                p_count = min(len(seed_xs), int(base_seed_count * 0.8))
+                for s_idx in range(p_count):
+                    sx, sy = int(seed_ys[s_idx]), int(seed_xs[s_idx])
+                    base_rgb = cur_thfm[sx, sy]
+                    mag_val = cur_mag[sx, sy]
+                    
+                    mapped_rgb = np.array(self._map_color(base_rgb, color_source, mag_val), dtype=np.float32) * thfm_color_intensity
+                    
+                    p_rad = max(1, int(1 + (mag_val / 8.0)))
+                    cv2.circle(cur_particle_layer, (sy, sx), p_rad, (mapped_rgb * 1.2).clip(0, 255).tolist(), -1, cv2.LINE_AA)
+                    
+                    # Kinetic trail spark
+                    fu, fv = u[sx, sy], v[sx, sy]
+                    tail_x = int(round(sy - fu * 2.0))
+                    tail_y = int(round(sx - fv * 2.0))
+                    if 0 <= tail_x < w and 0 <= tail_y < h:
+                        cv2.line(cur_particle_layer, (sy, sx), (tail_x, tail_y), (mapped_rgb * 0.7).clip(0, 255).tolist(), 1, cv2.LINE_AA)
+            
+            # Optical bloom & composite
+            cur_composite = cur_ribbon_layer + cur_particle_layer
+            if glow_strength > 0:
+                bloom = cv2.GaussianBlur(cur_composite, (0, 0), sigmaX=7.0, sigmaY=7.0) * glow_strength
+                cur_composite += bloom
+            
+            acc_canvas += cur_composite * (1.0 - temporal_decay * 0.3)
+            
+            frame_final = np.clip(acc_canvas, 0, 255).astype(np.uint8)
+            out_motion_field_frames.append(frame_final)
+            ribbons_layer_frames.append(np.clip(cur_ribbon_layer, 0, 255).astype(np.uint8))
+            particles_layer_frames.append(np.clip(cur_particle_layer, 0, 255).astype(np.uint8))
+        
+        output_dir = folder_paths.get_output_directory() if hasattr(folder_paths, "get_output_directory") else tempfile.gettempdir()
+        tmp_mp4 = os.path.join(output_dir, f"THFM_Procedural_Motion_{int(time.time())}.mp4")
+        writer = cv2.VideoWriter(tmp_mp4, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+        for f in out_motion_field_frames:
+            writer.write(cv2.cvtColor(f, cv2.COLOR_RGB2BGR))
+        writer.release()
+        
+        out_tensor = torch.from_numpy(np.stack(out_motion_field_frames, axis=0).astype(np.float32) / 255.0)
+        rib_tensor = torch.from_numpy(np.stack(ribbons_layer_frames, axis=0).astype(np.float32) / 255.0)
+        part_tensor = torch.from_numpy(np.stack(particles_layer_frames, axis=0).astype(np.float32) / 255.0)
+        
+        print(f"[THFMProceduralMotionRenderer] Rendered {num_frames} frames of abstract flowing motion field.")
+        return (out_tensor, rib_tensor, part_tensor, tmp_mp4)
+
+
+class THFMStagePipelineViewer:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "thfm_raw_input": (ANY_TYPE,),
+                "thfm_optical_flow": (ANY_TYPE,),
+                "thfm_surface_energy": (ANY_TYPE,),
+                "procedural_motion_field": (ANY_TYPE,),
+            },
+            "optional": {
+                "layout": (["grid_2x2", "horizontal_1x4", "side_by_side_dual"], {"default": "grid_2x2"}),
+                "show_hud_labels": (["enable", "disable"], {"default": "enable"}),
+                "frame_rate": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "format": (["mp4", "gif", "animated_webp"], {"default": "mp4"}),
+                "save_output": ("BOOLEAN", {"default": True}),
+                "filename_prefix": ("STRING", {"default": "THFM_MotionField_Pipeline"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("pipeline_preview", "video_path")
+    FUNCTION = "generate_preview"
+    CATEGORY = "kinetic_motion/thfm"
+
+    def _to_pil_list(self, val):
+        if val is None: return []
+        frames = []
+        v_path = get_video_file_path(val)
+        if v_path and os.path.exists(v_path):
+            cap = cv2.VideoCapture(v_path)
+            while True:
+                ret, frame = cap.read()
+                if not ret: break
+                frames.append(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+            cap.release()
+            return frames
+        if isinstance(val, torch.Tensor):
+            t = val.cpu().numpy()
+            if len(t.shape) == 4:
+                for idx in range(t.shape[0]):
+                    frames.append(Image.fromarray((np.clip(t[idx], 0.0, 1.0) * 255.0).astype(np.uint8)))
+            elif len(t.shape) == 3:
+                frames.append(Image.fromarray((np.clip(t, 0.0, 1.0) * 255.0).astype(np.uint8)))
+            return frames
+        if isinstance(val, list):
+            for item in val:
+                frames.extend(self._to_pil_list(item))
+        return frames
+
+    def _draw_hud(self, img, title, subtitle=""):
+        h, w = img.shape[:2]
+        overlay = img.copy()
+        cv2.rectangle(overlay, (0, 0), (w, 36), (15, 18, 24), -1)
+        cv2.line(overlay, (0, 36), (w, 36), (0, 220, 255), 1)
+        cv2.addWeighted(overlay, 0.85, img, 0.15, 0, img)
+        cv2.putText(img, title, (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(img, title, (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (0, 230, 255), 1, cv2.LINE_AA)
+        if subtitle:
+            tw = cv2.getTextSize(subtitle, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)[0][0]
+            cv2.putText(img, subtitle, (max(10, w - tw - 10), 23), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 210, 240), 1, cv2.LINE_AA)
+
+    def generate_preview(self, thfm_raw_input, thfm_optical_flow, thfm_surface_energy, procedural_motion_field, layout="grid_2x2", show_hud_labels="enable", frame_rate=24, format="mp4", save_output=True, filename_prefix="THFM_MotionField_Pipeline"):
+        streams = [
+            self._to_pil_list(thfm_raw_input),
+            self._to_pil_list(thfm_optical_flow),
+            self._to_pil_list(thfm_surface_energy),
+            self._to_pil_list(procedural_motion_field)
+        ]
+        
+        valid_lens = [len(s) for s in streams if len(s) > 0]
+        if not valid_lens:
+            blank = np.zeros((1, 540, 960, 3), dtype=np.float32)
+            return (torch.from_numpy(blank), "")
+        
+        num_frames = max(valid_lens)
+        
+        # Determine cell size
+        ref_w, ref_h = 640, 360
+        for s in streams:
+            if s:
+                ref_w, ref_h = s[0].size
+                break
+        
+        cell_w, cell_h = 640, 360
+        
+        titles = [
+            ("Stage 1: THFM XYZ Body Input", "Surface 3D Coordinates"),
+            ("Stage 2: Dense Optical Flow on THFM", "Gunnar-Farneback Field"),
+            ("Stage 3: THFM Surface Kinetic Energy", "Coordinate Velocity Map"),
+            ("Stage 4: Procedural Flow Motion Field", "Abstract Continuous Trails")
+        ]
+        
+        grid_frames_pil = []
+        
+        for t in range(num_frames):
+            cells = []
+            for s_idx in range(4):
+                s = streams[s_idx]
+                if s:
+                    f = s[t % len(s)]
+                    f_np = np.array(f.convert("RGB").resize((cell_w, cell_h), Image.Resampling.BILINEAR))
+                else:
+                    f_np = np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+                
+                if show_hud_labels == "enable":
+                    f_copy = f_np.copy()
+                    self._draw_hud(f_copy, titles[s_idx][0], titles[s_idx][1])
+                    cells.append(f_copy)
+                else:
+                    cells.append(f_np)
+            
+            if layout == "grid_2x2":
+                top_row = np.hstack([cells[0], cells[1]])
+                bot_row = np.hstack([cells[2], cells[3]])
+                composite = np.vstack([top_row, bot_row])
+            elif layout == "horizontal_1x4":
+                composite = np.hstack(cells)
+            else: # side_by_side_dual (Raw vs Motion Field)
+                composite = np.hstack([cells[0], cells[3]])
+            
+            grid_frames_pil.append(Image.fromarray(composite))
+        
+        out_tensor = torch.from_numpy(np.stack([np.array(p).astype(np.float32) / 255.0 for p in grid_frames_pil], axis=0))
+        
+        output_dir = folder_paths.get_output_directory() if hasattr(folder_paths, "get_output_directory") else tempfile.gettempdir()
+        prefix = filename_prefix if filename_prefix else "THFM_Pipeline"
+        tmp_path = os.path.join(output_dir, f"{prefix}_{int(time.time())}.{format if format != 'animated_webp' else 'webp'}")
+        
+        cw, ch = grid_frames_pil[0].size
+        if format == "mp4":
+            writer = cv2.VideoWriter(tmp_path, cv2.VideoWriter_fourcc(*"mp4v"), frame_rate, (cw, ch))
+            for p in grid_frames_pil:
+                writer.write(cv2.cvtColor(np.array(p), cv2.COLOR_RGB2BGR))
+            writer.release()
+        elif format in ["gif", "animated_webp"]:
+            duration_ms = int(1000.0 / max(1, frame_rate))
+            grid_frames_pil[0].save(tmp_path, save_all=True, append_images=grid_frames_pil[1:], duration=duration_ms, loop=0)
+        
+        return (out_tensor, tmp_path)
+
+
 NODE_CLASS_MAPPINGS = {
     "GeminiProModel": GeminiProModel,
     "GeminiOmniModel": GeminiOmniModel,
@@ -5366,7 +5872,10 @@ NODE_CLASS_MAPPINGS = {
     "DualCharacterMaskSeparator": DualCharacterMaskSeparator,
     "SingleCharacterMaskKineticRenderer": SingleCharacterMaskKineticRenderer,
     "DualCharacterPhysicalCompositor": DualCharacterPhysicalCompositor,
-    "DualPathPipelineViewer": DualPathPipelineViewer
+    "DualPathPipelineViewer": DualPathPipelineViewer,
+    "THFMKineticFlowExtractor": THFMKineticFlowExtractor,
+    "THFMProceduralMotionRenderer": THFMProceduralMotionRenderer,
+    "THFMStagePipelineViewer": THFMStagePipelineViewer
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -5397,5 +5906,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DualCharacterMaskSeparator": "Dual-Character Color Separator (White vs Black Dancers)",
     "SingleCharacterMaskKineticRenderer": "Single-Character Mask Kinetic Renderer (Splines + TAPNet)",
     "DualCharacterPhysicalCompositor": "Dual-Character Physical Compositor (Master Duet Fuser)",
-    "DualPathPipelineViewer": "Dual-Path Duet Pipeline Viewer (8-Stage Synchronizer)"
+    "DualPathPipelineViewer": "Dual-Path Duet Pipeline Viewer (8-Stage Synchronizer)",
+    "THFMKineticFlowExtractor": "THFM Kinetic Flow Extractor (Dense Optical Flow on XYZ)",
+    "THFMProceduralMotionRenderer": "THFM Procedural Motion Field Renderer (Flow + XYZ Ribbons)",
+    "THFMStagePipelineViewer": "THFM Stage Pipeline Viewer (4-Stage HUD Synchronizer)"
 }
+
