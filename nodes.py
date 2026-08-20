@@ -5510,11 +5510,12 @@ class THFMProceduralMotionRenderer:
             },
             "optional": {
                 "graphics_mode": ([
+                    "dual_ribbons_and_particles",
                     "advected_kinetic_ribbons",
                     "lagrangian_particle_streamers",
                     "dense_vortex_filaments",
                     "hybrid_ribbons_and_particles"
-                ], {"default": "advected_kinetic_ribbons"}),
+                ], {"default": "dual_ribbons_and_particles"}),
                 "particle_density": ("FLOAT", {"default": 0.75, "min": 0.1, "max": 2.5, "step": 0.05, "tooltip": "Density multiplier for procedural ribbon and particle seeds"}),
                 "streamline_length": ("INT", {"default": 24, "min": 4, "max": 80, "step": 2, "tooltip": "Advection length in steps for continuous flow filaments"}),
                 "advection_speed": ("FLOAT", {"default": 1.8, "min": 0.1, "max": 5.0, "step": 0.1, "tooltip": "Velocity multiplier along vector field"}),
