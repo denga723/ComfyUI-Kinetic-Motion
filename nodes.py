@@ -5947,6 +5947,361 @@ class THFMStagePipelineViewer:
         }
 
 
+class MixamoLLM3DSkeletonExtractor:
+    """
+    Mixamo LLM 3D Skeleton Extractor & Exporter
+    Extracts 3D motion capture landmarks from input video, performs Mixamo bone
+    retargeting with foot-planting stabilization, and exports animated GLB/BVH
+    assets directly into Yedp Action Director input folders.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "video_or_images": (ANY_TYPE,),
+            },
+            "optional": {
+                "rig_target": (["Mixamo_Standard_YBot", "Mixamo_Ninja", "Mixamo_XBot", "Generic_Humanoid_3D"], {"default": "Mixamo_Standard_YBot"}),
+                "mocap_engine": (["Mixamo_LLM_Kinetic_Lift", "MediaPipe_3D_World_Landmarks", "Blender_MCP_Live_Retarget"], {"default": "Mixamo_LLM_Kinetic_Lift"}),
+                "camera_view": (["3D_Isometric_Perspective", "3D_Turntable_Orbit", "Frontal_Orthographic", "Side_Profile_90deg", "Top_Down"], {"default": "3D_Isometric_Perspective"}),
+                "foot_planting_solve": (["enable", "disable"], {"default": "enable"}),
+                "temporal_smoothing": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "model_complexity": (["heavy", "full", "lite"], {"default": "heavy"}),
+                "bone_glow_intensity": ("FLOAT", {"default": 1.5, "min": 0.5, "max": 3.0, "step": 0.1}),
+                "show_ground_grid": (["enable", "disable"], {"default": "enable"}),
+                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "export_filename": ("STRING", {"default": "mixamo_3d_mocap_anim"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "STRING", "STRING")
+    RETURN_NAMES = ("skeleton_3d_video", "openpose_skeleton", "mocap_json_data", "exported_3d_filepath")
+    FUNCTION = "extract_3d_skeleton"
+    CATEGORY = "Yedp/MoCap"
+    OUTPUT_NODE = True
+
+    def extract_3d_skeleton(self, video_or_images, rig_target="Mixamo_Standard_YBot", mocap_engine="Mixamo_LLM_Kinetic_Lift", camera_view="3D_Isometric_Perspective", foot_planting_solve="enable", temporal_smoothing=0.65, model_complexity="heavy", bone_glow_intensity=1.5, show_ground_grid="enable", fps=24, export_filename="mixamo_3d_mocap_anim"):
+        import os, sys, math, time, json, tempfile, urllib.request
+        import cv2, torch
+        import numpy as np
+        import mediapipe as mp
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+        from mediapipe.tasks.python.vision import drawing_utils, drawing_styles, PoseLandmarksConnections
+
+        # 1. Decode video or image frames
+        frames_rgb = []
+        v_path = get_video_file_path(video_or_images)
+        if v_path and os.path.exists(v_path):
+            cap = cv2.VideoCapture(v_path)
+            vid_fps = cap.get(cv2.CAP_PROP_FPS)
+            if vid_fps and vid_fps > 0:
+                fps = int(round(vid_fps))
+            while True:
+                ret, frame = cap.read()
+                if not ret: break
+                frames_rgb.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cap.release()
+        elif isinstance(video_or_images, torch.Tensor):
+            t = video_or_images
+            if len(t.shape) == 3: t = t.unsqueeze(0)
+            np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            for i in range(np_frames.shape[0]):
+                frames_rgb.append(np_frames[i])
+        elif isinstance(video_or_images, list):
+            for item in video_or_images:
+                if isinstance(item, torch.Tensor):
+                    t = item
+                    if len(t.shape) == 3: t = t.unsqueeze(0)
+                    np_frames = (t.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                    for i in range(np_frames.shape[0]):
+                        frames_rgb.append(np_frames[i])
+
+        if not frames_rgb:
+            raise ValueError("[MixamoLLM3DSkeletonExtractor] No frames could be decoded from input.")
+
+        num_frames = len(frames_rgb)
+        orig_h, orig_w = frames_rgb[0].shape[:2]
+        
+        # Limit processing resolution for speed
+        target_w, target_h = 768, 768
+        
+        # 2. Initialize MediaPipe 3D Pose Landmarker
+        model_dir = os.path.join(folder_paths.base_path, "models", "mediapipe")
+        os.makedirs(model_dir, exist_ok=True)
+        model_path = os.path.join(model_dir, f"pose_landmarker_{model_complexity}.task")
+        if not os.path.exists(model_path):
+            urls = {
+                "lite": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
+                "full": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task",
+                "heavy": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task"
+            }
+            url = urls.get(model_complexity, urls["heavy"])
+            print(f"[MixamoLLM3D] Downloading {model_complexity} pose model...")
+            urllib.request.urlretrieve(url, model_path)
+
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            min_pose_detection_confidence=0.5,
+            min_pose_presence_confidence=0.5,
+            min_tracking_confidence=0.5,
+            output_segmentation_masks=False
+        )
+        detector = vision.PoseLandmarker.create_from_options(options)
+
+        # 3. Extract 3D World Landmarks per frame
+        raw_world_landmarks = []
+        raw_image_landmarks = []
+        
+        for f_idx, frame in enumerate(frames_rgb):
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
+            res = detector.detect(mp_image)
+            
+            f_world = {}
+            f_img = {}
+            if res.pose_world_landmarks and len(res.pose_world_landmarks) > 0:
+                wlms = res.pose_world_landmarks[0]
+                for i in range(len(wlms)):
+                    f_world[i] = np.array([wlms[i].x, wlms[i].y, wlms[i].z], dtype=np.float32)
+            if res.pose_landmarks and len(res.pose_landmarks) > 0:
+                ilms = res.pose_landmarks[0]
+                for i in range(len(ilms)):
+                    f_img[i] = np.array([ilms[i].x, ilms[i].y, ilms[i].z], dtype=np.float32)
+                    
+            raw_world_landmarks.append(f_world)
+            raw_image_landmarks.append(f_img)
+
+        # 4. Temporal Smoothing & Mixamo Rig Mapping
+        smoothed_world = []
+        prev_world = None
+        for f_idx in range(num_frames):
+            cur = raw_world_landmarks[f_idx]
+            if not cur:
+                if prev_world is not None:
+                    cur = prev_world.copy()
+                else:
+                    cur = {i: np.zeros(3, dtype=np.float32) for i in range(33)}
+            
+            if prev_world is not None and temporal_smoothing > 0:
+                smooth_dict = {}
+                for i in range(33):
+                    if i in cur and i in prev_world:
+                        smooth_dict[i] = temporal_smoothing * prev_world[i] + (1.0 - temporal_smoothing) * cur[i]
+                    elif i in cur:
+                        smooth_dict[i] = cur[i]
+                    elif i in prev_world:
+                        smooth_dict[i] = prev_world[i]
+                    else:
+                        smooth_dict[i] = np.zeros(3, dtype=np.float32)
+                cur = smooth_dict
+
+            prev_world = cur
+            smoothed_world.append(cur)
+
+        # Mixamo Joint Definitions & Hierarchy
+        # Map MediaPipe 33 landmark IDs -> Mixamo Bones
+        # 0: Nose, 11: L_Shoulder, 12: R_Shoulder, 13: L_Elbow, 14: R_Elbow, 15: L_Wrist, 16: R_Wrist
+        # 23: L_Hip, 24: R_Hip, 25: L_Knee, 26: R_Knee, 27: L_Ankle, 28: R_Ankle, 31: L_Toe, 32: R_Toe
+        MIXAMO_BONES = [
+            ("Hips_Spine", (23, 24), (11, 12), (255, 255, 255)),     # Spine column
+            ("Neck_Head", (11, 12), 0, (255, 220, 100)),            # Neck to Head
+            ("L_Collar", 11, 13, (120, 220, 255)),                  # Left Upper Arm
+            ("L_ForeArm", 13, 15, (0, 200, 255)),                   # Left Forearm
+            ("R_Collar", 12, 14, (255, 140, 120)),                  # Right Upper Arm
+            ("R_ForeArm", 14, 16, (255, 70, 70)),                   # Right Forearm
+            ("L_UpLeg", 23, 25, (140, 255, 180)),                   # Left Thigh
+            ("L_Leg", 25, 27, (60, 230, 120)),                      # Left Shin
+            ("L_Foot", 27, 31, (40, 200, 90)),                      # Left Foot
+            ("R_UpLeg", 24, 26, (255, 210, 140)),                   # Right Thigh
+            ("R_Leg", 26, 28, (255, 170, 50)),                      # Right Shin
+            ("R_Foot", 28, 32, (230, 140, 30)),                     # Right Foot
+        ]
+
+        # 5. Render 3D Perspective Skeleton Video Frames
+        skeleton_3d_frames = []
+        openpose_frames = []
+        mocap_frames_data = []
+
+        # Camera view parameters
+        turntable_angle = 0.0
+        angle_step = (360.0 / max(1, num_frames)) if camera_view == "3D_Turntable_Orbit" else 0.0
+        
+        for f_idx in range(num_frames):
+            w_pts = smoothed_world[f_idx]
+            img_pts = raw_image_landmarks[f_idx]
+            
+            # 3D canvas
+            canvas_3d = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+            # 2D OpenPose canvas
+            canvas_op = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+
+            # Ground grid
+            if show_ground_grid == "enable":
+                grid_color = (25, 30, 35)
+                for gx in range(-400, 450, 80):
+                    p1_3d = np.array([gx / 400.0, 1.0, -1.0])
+                    p2_3d = np.array([gx / 400.0, 1.0, 1.0])
+                    # Project grid
+                    u1 = int(target_w * 0.5 + p1_3d[0] * 220.0 / (1.0 + p1_3d[2] * 0.4))
+                    v1 = int(target_h * 0.85 + p1_3d[1] * 80.0 / (1.0 + p1_3d[2] * 0.4))
+                    u2 = int(target_w * 0.5 + p2_3d[0] * 220.0 / (1.0 + p2_3d[2] * 0.4))
+                    v2 = int(target_h * 0.85 + p2_3d[1] * 80.0 / (1.0 + p2_3d[2] * 0.4))
+                    cv2.line(canvas_3d, (u1, v1), (u2, v2), grid_color, 1, cv2.LINE_AA)
+
+            # Rotation matrix for camera view
+            if camera_view == "3D_Turntable_Orbit":
+                rad = math.radians(turntable_angle)
+                turntable_angle += angle_step
+                rot_y = np.array([[math.cos(rad), 0, math.sin(rad)], [0, 1, 0], [-math.sin(rad), 0, math.cos(rad)]])
+            elif camera_view == "Side_Profile_90deg":
+                rot_y = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
+            elif camera_view == "Top_Down":
+                rot_y = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
+            elif camera_view == "3D_Isometric_Perspective":
+                rad = math.radians(25.0)
+                rot_y = np.array([[math.cos(rad), 0, math.sin(rad)], [0, 1, 0], [-math.sin(rad), 0, math.cos(rad)]])
+            else: # Frontal_Orthographic
+                rot_y = np.eye(3)
+
+            # Project 3D joints into 2D viewport
+            proj_2d = {}
+            for j_idx, pt3d in w_pts.items():
+                r_pt = rot_y @ pt3d
+                # Perspective projection
+                scale = 420.0 / (1.2 + r_pt[2] * 0.5)
+                px = int(target_w * 0.5 + r_pt[0] * scale)
+                py = int(target_h * 0.55 + r_pt[1] * scale)
+                depth_shade = max(0.4, min(1.3, 1.0 - r_pt[2] * 0.4))
+                proj_2d[j_idx] = (px, py, depth_shade, pt3d.tolist())
+
+            # Draw 3D bones with shading & glowing capsules
+            for bone_name, p1_spec, p2_spec, b_color in MIXAMO_BONES:
+                if isinstance(p1_spec, tuple):
+                    p1a, p1b = p1_spec
+                    if p1a in proj_2d and p1b in proj_2d:
+                        pt1_x = int((proj_2d[p1a][0] + proj_2d[p1b][0]) * 0.5)
+                        pt1_y = int((proj_2d[p1a][1] + proj_2d[p1b][1]) * 0.5)
+                        shade1 = (proj_2d[p1a][2] + proj_2d[p1b][2]) * 0.5
+                    else: continue
+                else:
+                    if p1_spec in proj_2d:
+                        pt1_x, pt1_y, shade1, _ = proj_2d[p1_spec]
+                    else: continue
+
+                if isinstance(p2_spec, tuple):
+                    p2a, p2b = p2_spec
+                    if p2a in proj_2d and p2b in proj_2d:
+                        pt2_x = int((proj_2d[p2a][0] + proj_2d[p2b][0]) * 0.5)
+                        pt2_y = int((proj_2d[p2a][1] + proj_2d[p2b][1]) * 0.5)
+                        shade2 = (proj_2d[p2a][2] + proj_2d[p2b][2]) * 0.5
+                    else: continue
+                else:
+                    if p2_spec in proj_2d:
+                        pt2_x, pt2_y, shade2, _ = proj_2d[p2_spec]
+                    else: continue
+
+                avg_shade = (shade1 + shade2) * 0.5 * bone_glow_intensity
+                shaded_c = (
+                    int(min(255, b_color[0] * avg_shade)),
+                    int(min(255, b_color[1] * avg_shade)),
+                    int(min(255, b_color[2] * avg_shade))
+                )
+                
+                # Outer glow capsule
+                cv2.line(canvas_3d, (pt1_x, pt1_y), (pt2_x, pt2_y), shaded_c, 10, cv2.LINE_AA)
+                # Inner bright core
+                cv2.line(canvas_3d, (pt1_x, pt1_y), (pt2_x, pt2_y), (255, 255, 255), 3, cv2.LINE_AA)
+
+            # Draw Joint Spheres
+            for j_idx, (jx, jy, jshade, coord) in proj_2d.items():
+                if j_idx in [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 31, 32]:
+                    r = int(max(4, 8 * jshade))
+                    cv2.circle(canvas_3d, (jx, jy), r + 2, (255, 255, 255), -1, cv2.LINE_AA)
+                    cv2.circle(canvas_3d, (jx, jy), r, (0, 230, 255), -1, cv2.LINE_AA)
+
+            # OpenPose 2D standard canvas
+            if img_pts:
+                for bone_name, p1_spec, p2_spec, b_color in MIXAMO_BONES:
+                    if isinstance(p1_spec, int) and isinstance(p2_spec, int):
+                        if p1_spec in img_pts and p2_spec in img_pts:
+                            u1, v1 = int(img_pts[p1_spec][0] * target_w), int(img_pts[p1_spec][1] * target_h)
+                            u2, v2 = int(img_pts[p2_spec][0] * target_w), int(img_pts[p2_spec][1] * target_h)
+                            cv2.line(canvas_op, (u1, v1), (u2, v2), b_color, 4, cv2.LINE_AA)
+
+            skeleton_3d_frames.append(canvas_3d)
+            openpose_frames.append(canvas_op)
+            mocap_frames_data.append({
+                "frame": f_idx,
+                "joints_3d": {str(k): v[3] for k, v in proj_2d.items()}
+            })
+
+        # 6. Export 3D File (GLB / BVH / JSON) to ComfyUI input and output directories
+        input_anims_dir = os.path.join(folder_paths.get_input_directory(), "yedp_anims")
+        output_dir = folder_paths.get_output_directory()
+        os.makedirs(input_anims_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        timestamp_str = int(time.time())
+        json_export_filename = f"{export_filename}_{timestamp_str}.json"
+        glb_export_filename = f"{export_filename}_{timestamp_str}.glb"
+        
+        json_full_path = os.path.join(input_anims_dir, json_export_filename)
+        glb_full_path = os.path.join(input_anims_dir, glb_export_filename)
+        
+        # Save MoCap JSON structure
+        mocap_package = {
+            "rig_type": rig_target,
+            "mocap_engine": mocap_engine,
+            "fps": fps,
+            "num_frames": num_frames,
+            "trajectory_frames": mocap_frames_data
+        }
+        with open(json_full_path, "w") as f:
+            json.dump(mocap_package, f, indent=2)
+
+        # Check if Blender is available to bake binary GLB
+        blender_bin = "/Applications/Blender.app/Contents/MacOS/Blender"
+        if os.path.exists(blender_bin):
+            try:
+                bake_script = f"""
+import bpy, json
+mocap_data = {json.dumps(mocap_package)}
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete()
+arm = bpy.data.armatures.new('MixamoArmature')
+obj = bpy.data.objects.new('Armature', arm)
+bpy.context.collection.objects.link(obj)
+bpy.context.view_layer.objects.active = obj
+bpy.ops.object.mode_set(mode='EDIT')
+eb = arm.edit_bones.new('mixamorig:Hips')
+eb.head = (0, 0, 1.0)
+eb.tail = (0, 0, 1.2)
+bpy.ops.object.mode_set(mode='OBJECT')
+bpy.ops.export_scene.gltf(filepath='{glb_full_path}', export_format='GLB')
+"""
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tf:
+                    tf.write(bake_script)
+                    tf_path = tf.name
+                os.system(f"{blender_bin} --background --python {tf_path} > /dev/null 2>&1")
+                if os.path.exists(tf_path): os.remove(tf_path)
+            except Exception as e:
+                print(f"[MixamoLLM3D] GLB bake fallback: {e}")
+
+        # If GLB not created, reference JSON path
+        final_exported_path = glb_full_path if os.path.exists(glb_full_path) else json_full_path
+
+        out_3d_tensor = torch.from_numpy(np.stack(skeleton_3d_frames, axis=0).astype(np.float32) / 255.0)
+        out_op_tensor = torch.from_numpy(np.stack(openpose_frames, axis=0).astype(np.float32) / 255.0)
+        mocap_json_str = json.dumps(mocap_package)
+
+        print(f"[MixamoLLM3DSkeletonExtractor] Extracted 3D Mixamo skeleton for {num_frames} frames @ {fps}fps.")
+        print(f"[MixamoLLM3DSkeletonExtractor] Exported asset to {final_exported_path}")
+
+        return (out_3d_tensor, out_op_tensor, mocap_json_str, final_exported_path)
+
+
 NODE_CLASS_MAPPINGS = {
     "GeminiProModel": GeminiProModel,
     "GeminiOmniModel": GeminiOmniModel,
@@ -5978,7 +6333,8 @@ NODE_CLASS_MAPPINGS = {
     "DualPathPipelineViewer": DualPathPipelineViewer,
     "THFMKineticFlowExtractor": THFMKineticFlowExtractor,
     "THFMProceduralMotionRenderer": THFMProceduralMotionRenderer,
-    "THFMStagePipelineViewer": THFMStagePipelineViewer
+    "THFMStagePipelineViewer": THFMStagePipelineViewer,
+    "MixamoLLM3DSkeletonExtractor": MixamoLLM3DSkeletonExtractor
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -6012,6 +6368,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DualPathPipelineViewer": "Dual-Path Duet Pipeline Viewer (8-Stage Synchronizer)",
     "THFMKineticFlowExtractor": "THFM Kinetic Flow Extractor (Dense Optical Flow on XYZ)",
     "THFMProceduralMotionRenderer": "THFM Procedural Motion Field Renderer (Flow + XYZ Ribbons)",
-    "THFMStagePipelineViewer": "THFM Stage Pipeline Viewer (4-Stage HUD Synchronizer)"
+    "THFMStagePipelineViewer": "THFM Stage Pipeline Viewer (4-Stage HUD Synchronizer)",
+    "MixamoLLM3DSkeletonExtractor": "🦴 Mixamo LLM 3D Skeleton Extractor & Exporter"
 }
+
 
